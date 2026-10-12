@@ -178,6 +178,13 @@ describe("tenant isolation and role permissions", () => {
     await fails("update profiles set status = 'disabled' where id = $1", [ids.admin], /own account/)
   })
 
+  it("signed-in users can call record_sign_in(), which returns their role only when active", async () => {
+    await asUser(db, ids.admin)
+    expect(await one("select record_sign_in() as role")).toEqual({ role: "super_admin" })
+    await asUser(db, ids.disabledIntern)
+    expect(await one("select record_sign_in() as role")).toEqual({ role: null })
+  })
+
   it("disabled users lose all access", async () => {
     await asUser(db, ids.disabledIntern)
     const r = await one<{ role: string | null }>("select auth_role() as role")

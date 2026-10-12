@@ -47,9 +47,18 @@ export async function signIn(_prev: FormState, formData: FormData): Promise<Form
 
   const supabase = await createClient()
   const { error } = await supabase.auth.signInWithPassword({ email, password: parsed.data.password })
-  if (error) return { error: "Invalid email or password." }
+  if (error) {
+    // Server log only (never the password); the user always sees the same generic message.
+    console.warn("[signIn] auth rejected", { status: error.status, code: error.code })
+    return { error: "Invalid email or password." }
+  }
 
-  const { data: role } = await supabase.rpc("record_sign_in")
+  const { data: role, error: roleError } = await supabase.rpc("record_sign_in")
+  if (roleError) {
+    console.error("[signIn] record_sign_in failed", roleError)
+    await supabase.auth.signOut()
+    return { error: "Sign-in could not be completed because the server is misconfigured. Contact your administrator." }
+  }
   if (!role) {
     await supabase.auth.signOut()
     return { error: "Your account is not active. Contact your administrator." }
