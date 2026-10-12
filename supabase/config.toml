@@ -1,0 +1,30 @@
+# Used by the Supabase CLI for local development (`supabase start`) and as a reference for
+# the hosted project's Auth settings.
+project_id = "linkops"
+
+[api]
+schemas = ["public"]
+max_rows = 1000
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/confirm"]
+# Access is invitation-only. Public sign-up must stay disabled in production too.
+enable_signup = false
+jwt_expiry = 3600
+
+[auth.email]
+enable_signup = false
+double_confirm_changes = true
+enable_confirmations = true
+
+[auth.email.template.invite]
+subject = "You're invited to LinkOps"
+content_path = "./supabase/templates/invite.html"
+
+[auth.email.template.recovery]
+subject = "Reset your LinkOps password"
+content_path = "./supabase/templates/recovery.html"
+
+[storage]
+file_size_limit = "10MiB"
