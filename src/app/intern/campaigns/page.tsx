@@ -8,7 +8,7 @@ import type { Campaign } from "@/lib/types"
 export const metadata = { title: "My Campaigns" }
 
 export default async function InternCampaigns() {
-  const { supabase } = await requireRole(["intern"])
+  const { supabase } = await requireRole(["intern"], "intern.campaigns")
   const [{ data }, links] = await Promise.all([
     supabase.from("campaigns").select("*, clients(company_name)").neq("status", "archived").order("code"),
     supabase.from("campaign_keywords").select("campaign_id, is_primary, keywords(keyword)"),

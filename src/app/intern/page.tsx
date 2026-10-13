@@ -2,6 +2,7 @@ import Link from "next/link"
 import { LinkButton } from "@/components/ui/link-button"
 import { Plus } from "lucide-react"
 import { requireRole } from "@/lib/auth"
+import { can } from "@/lib/permissions"
 import { PageHeader, Section } from "@/components/shared/page-header"
 import { ProgressBar, StatCard } from "@/components/shared/stat-card"
 import { SubmissionStatusBadge, TaskStatusBadge, ToneBadge } from "@/components/shared/status-badge"
@@ -17,7 +18,7 @@ import type { Submission, Task } from "@/lib/types"
 export const metadata = { title: "My Dashboard" }
 
 export default async function InternHome() {
-  const { supabase, profile } = await requireRole(["intern"])
+  const { supabase, profile, permissions } = await requireRole(["intern"], "intern.dashboard")
   const reports = await getSetting("reports")
   const tz = profile.timezone || reports.timezone
   const today = todayIn(tz)
@@ -39,7 +40,7 @@ export default async function InternHome() {
 
   return (
     <>
-      <PageHeader title={`Hello, ${profile.full_name.split(" ")[0] || "there"}`} description={`${formatDay(today)} · ${(campaigns.data ?? []).length} assigned campaigns`} actions={<LinkButton href="/intern/submissions/new" variant="default"><Plus /> New submission</LinkButton>} />
+      <PageHeader title={`Hello, ${profile.full_name.split(" ")[0] || "there"}`} description={`${formatDay(today)} · ${(campaigns.data ?? []).length} assigned campaigns`} actions={can(permissions, "intern.submissions.manage") ? <LinkButton href="/intern/submissions/new" variant="default"><Plus /> New submission</LinkButton> : null} />
       <Section title="Today's target">
         <div className="flex flex-wrap items-center gap-4">
           <div className="tabular text-3xl font-semibold">{day?.submitted ?? 0}<span className="text-lg text-muted-foreground"> / {todayTarget}</span></div>
@@ -47,7 +48,7 @@ export default async function InternHome() {
         </div>
       </Section>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="Open tasks" value={tasks.length} href="/intern/tasks" />
+        <StatCard label="Open tasks" value={tasks.length} href={can(permissions, "intern.tasks") ? "/intern/tasks" : undefined} />
         <StatCard label="Pending reviews" value={pending ?? 0} hint="With reviewer or client" />
         <StatCard label="Client approved (30d)" value={month?.client_approved ?? 0} tone="success" />
         <StatCard label="Verified live (30d)" value={month?.verified_live ?? 0} tone="success" hint={`${month?.published ?? 0} published · ${month?.rejected ?? 0} rejected`} />
@@ -57,14 +58,18 @@ export default async function InternHome() {
           <ul>
             {attention.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5 text-sm last:border-0">
-                <Link href={`/intern/submissions/${s.id}`} className="hover:text-primary"><span className="font-medium">{s.code}</span> · {s.content_title ?? s.proposed_domain}</Link>
+                {can(permissions, "intern.submissions") ? (
+                  <Link href={`/intern/submissions/${s.id}`} className="hover:text-primary"><span className="font-medium">{s.code}</span> · {s.content_title ?? s.proposed_domain}</Link>
+                ) : (
+                  <span><span className="font-medium">{s.code}</span> · {s.content_title ?? s.proposed_domain}</span>
+                )}
                 <span className="flex items-center gap-2"><SubmissionStatusBadge status={s.status} /><span className="text-xs text-muted-foreground">{timeAgo(s.updated_at)}</span></span>
               </li>
             ))}
           </ul>
         </Section>
       ) : null}
-      <Section title="My open tasks" bodyClassName="p-0" actions={<Link href="/intern/tasks" className="text-xs text-primary hover:underline">All tasks</Link>}>
+      <Section title="My open tasks" bodyClassName="p-0" actions={can(permissions, "intern.tasks") ? <Link href="/intern/tasks" className="text-xs text-primary hover:underline">All tasks</Link> : null}>
         {tasks.length === 0 ? <p className="p-4 text-sm text-muted-foreground">No open tasks. Your manager will assign work here.</p> : (
           <ul>
             {tasks.slice(0, 8).map((t) => (
@@ -75,7 +80,7 @@ export default async function InternHome() {
                 </div>
                 {t.due_date && t.due_date < today ? <ToneBadge tone="danger">Overdue</ToneBadge> : null}
                 <TaskStatusBadge status={t.status} />
-                <InternTaskButtons taskId={t.id} status={t.status} />
+                {can(permissions, "intern.tasks") ? <InternTaskButtons taskId={t.id} status={t.status} canSubmit={can(permissions, "intern.submissions.manage")} /> : null}
               </li>
             ))}
           </ul>

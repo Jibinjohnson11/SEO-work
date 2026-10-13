@@ -9,14 +9,20 @@ max_rows = 1000
 [auth]
 site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/auth/confirm"]
-# Access is invitation-only. Public sign-up must stay disabled in production too.
-enable_signup = false
+# Sign-up is enabled for the /signup page. A self-registered account gets a 'pending' profile
+# with no role (trigger public.handle_self_signup) and no data access until a Super Admin
+# approves it and enables features. Set enable_signup = false to go back to invitation-only.
+enable_signup = true
 jwt_expiry = 3600
 
 [auth.email]
-enable_signup = false
+enable_signup = true
 double_confirm_changes = true
 enable_confirmations = true
+
+[auth.email.template.confirmation]
+subject = "Confirm your LinkOps account"
+content_path = "./supabase/templates/confirmation.html"
 
 [auth.email.template.invite]
 subject = "You're invited to LinkOps"

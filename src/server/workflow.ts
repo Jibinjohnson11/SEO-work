@@ -32,7 +32,7 @@ function revalidateSubmission(submissionId?: string) {
 export async function saveSubmission(submissionId: string | null, input: SubmissionInput, submit: boolean) {
   return run(async () => {
     const data = submissionSchema.parse(input)
-    const { supabase } = await authorize(["intern"])
+    const { supabase } = await authorize(["intern"], "intern.submissions.manage")
     const newId = must(
       await supabase.rpc("submission_save", {
         p_id: submissionId ? id.parse(submissionId) : null,
@@ -47,7 +47,7 @@ export async function saveSubmission(submissionId: string | null, input: Submiss
 
 export async function setMyTaskStatus(taskId: string, status: "in_progress" | "submitted") {
   return run(async () => {
-    const { supabase } = await authorize(["intern"])
+    const { supabase } = await authorize(["intern"], "intern.tasks")
     must(await supabase.rpc("task_set_status", { p_task_id: id.parse(taskId), p_status: status }))
     revalidatePath("/intern/tasks")
   }, "Task updated")
@@ -74,7 +74,7 @@ export async function uploadSubmissionFiles(formData: FormData) {
     const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0)
     if (!files.length) throw new Error("Choose at least one file")
     if (files.length > 10) throw new Error("Upload at most 10 files at a time")
-    const { supabase } = await authorize(["intern", "super_admin"])
+    const { supabase } = await authorize(["intern", "super_admin"], "intern.submissions.manage")
     for (const file of files) {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? ""
       if (!ALLOWED_FILE_TYPES[file.type]?.includes(ext)) throw new Error(`${file.name}: file type not allowed`)
@@ -104,7 +104,7 @@ export async function uploadSubmissionFiles(formData: FormData) {
 
 export async function removeSubmissionFile(fileId: string) {
   return run(async () => {
-    const { supabase } = await authorize(["intern", "super_admin"])
+    const { supabase } = await authorize(["intern", "super_admin"], "intern.submissions.manage")
     const path = must(await supabase.rpc("submission_remove_file", { p_file_id: id.parse(fileId) })) as string
     await supabase.storage.from("submission-files").remove([path])
     revalidateSubmission()
@@ -114,7 +114,7 @@ export async function removeSubmissionFile(fileId: string) {
 /** Short-lived download link; storage RLS decides whether the user may read the file. */
 export async function getFileUrl(fileId: string) {
   return run(async () => {
-    const { supabase } = await authorize(["intern", "super_admin"])
+    const { supabase } = await authorize(["intern", "super_admin"], "intern.submissions")
     const f = must(await supabase.from("submission_files").select("storage_path, file_name").eq("id", id.parse(fileId)).single())
     const signed = await supabase.storage.from("submission-files").createSignedUrl(f.storage_path, 120, { download: f.file_name })
     if (signed.error) throw signed.error
@@ -210,7 +210,7 @@ export async function adminEditSubmission(submissionId: string, input: z.infer<t
 export async function clientDecision(submissionId: string, input: z.infer<typeof clientDecisionSchema>) {
   return run(async () => {
     const data = clientDecisionSchema.parse(input)
-    const { supabase } = await authorize(["client"])
+    const { supabase } = await authorize(["client"], "portal.approvals.decide")
     must(
       await supabase.rpc("submission_client_decision", {
         p_id: id.parse(submissionId),
@@ -229,7 +229,7 @@ export async function clientDecision(submissionId: string, input: z.infer<typeof
 export async function recordPublication(submissionId: string, input: z.infer<typeof publicationSchema>) {
   return run(async () => {
     const data = publicationSchema.parse(input)
-    const { supabase } = await authorize(["intern", "super_admin"])
+    const { supabase } = await authorize(["intern", "super_admin"], "intern.submissions.manage")
     const publishedId = must(
       await supabase.rpc("submission_record_publication", {
         p_id: id.parse(submissionId),

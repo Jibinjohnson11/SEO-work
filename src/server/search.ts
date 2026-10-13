@@ -3,6 +3,7 @@
 import { z } from "zod"
 import { authorize } from "@/lib/auth"
 import { run } from "@/lib/actions"
+import { can } from "@/lib/permissions"
 
 export interface SearchHit {
   group: string
@@ -11,15 +12,19 @@ export interface SearchHit {
   href: string
 }
 
-/** Role-aware global search. Every query runs as the user, so RLS limits the results. */
+/**
+ * Role-aware global search. Every query runs as the user, so RLS limits the results, and only
+ * features the user has been granted are searched.
+ */
 export async function globalSearch(raw: string) {
   return run(async () => {
     const q = z.string().trim().min(2).max(80).parse(raw).replace(/[%_,()*\\]/g, " ")
     const like = `%${q}%`
-    const { supabase, profile } = await authorize(["super_admin", "intern", "client"])
+    const { supabase, profile, permissions } = await authorize(["super_admin", "intern", "client"])
     const hits: SearchHit[] = []
 
     if (profile.role === "client") {
+      if (!can(permissions, "portal.approvals")) return hits
       const { data } = await supabase.rpc("client_portal_submissions", { p_queue_only: false })
       for (const s of (data ?? []) as { id: string; code: string; content_title: string | null; proposed_website: string; campaign_code: string }[]) {
         if (`${s.code} ${s.content_title} ${s.proposed_website} ${s.campaign_code}`.toLowerCase().includes(q.toLowerCase()))
@@ -29,11 +34,18 @@ export async function globalSearch(raw: string) {
     }
 
     const base = profile.role === "super_admin" ? "/admin" : "/intern"
+    const none = { data: [] as never[] }
     const [campaigns, submissions, keywords, tasks] = await Promise.all([
-      supabase.from("campaigns").select("id, code, name").or(`code.ilike.${like},name.ilike.${like}`).limit(6),
-      supabase.from("backlink_submissions").select("id, code, content_title, proposed_website").or(`code.ilike.${like},content_title.ilike.${like},proposed_website.ilike.${like},anchor_text.ilike.${like}`).limit(8),
-      supabase.from("keywords").select("id, keyword, code").or(`keyword.ilike.${like},code.ilike.${like}`).limit(6),
-      supabase.from("tasks").select("id, code, title").or(`code.ilike.${like},title.ilike.${like}`).limit(6),
+      can(permissions, "intern.campaigns")
+        ? supabase.from("campaigns").select("id, code, name").or(`code.ilike.${like},name.ilike.${like}`).limit(6)
+        : none,
+      can(permissions, "intern.submissions")
+        ? supabase.from("backlink_submissions").select("id, code, content_title, proposed_website").or(`code.ilike.${like},content_title.ilike.${like},proposed_website.ilike.${like},anchor_text.ilike.${like}`).limit(8)
+        : none,
+      can(permissions, "intern.campaigns")
+        ? supabase.from("keywords").select("id, keyword, code").or(`keyword.ilike.${like},code.ilike.${like}`).limit(6)
+        : none,
+      can(permissions, "intern.tasks") ? supabase.from("tasks").select("id, code, title").or(`code.ilike.${like},title.ilike.${like}`).limit(6) : none,
     ])
     for (const c of campaigns.data ?? []) hits.push({ group: "Campaigns", label: `${c.code} · ${c.name}`, href: `${base}/campaigns/${c.id}` })
     for (const s of submissions.data ?? []) hits.push({ group: "Submissions", label: `${s.code} · ${s.content_title ?? s.proposed_website}`, href: `${base}/submissions/${s.id}` })

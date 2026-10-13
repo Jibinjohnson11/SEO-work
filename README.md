@@ -19,10 +19,10 @@ Stack: Next.js 16 (App Router, TypeScript), Tailwind CSS 4, shadcn/ui (Base UI),
    - CLI: `supabase link --project-ref <ref>` then `supabase db push`
    - Dashboard → SQL Editor: paste and run each file in order.
 3. Configure **Authentication → Providers / Settings**:
-   - **Disable public sign-ups.** Access is by invitation only.
+   - **Allow new users to sign up** and keep **Confirm email** on. This powers the *Create account* page. Self-registered accounts have **no access** until a Super Admin approves them (see §2.1). To stay invitation-only instead, disable sign-ups; the page then shows a "self-registration is turned off" message.
    - Site URL: your app URL, e.g. `https://linkops.your-agency.com`.
    - Redirect URLs: add `https://<your-app>/auth/confirm`.
-4. Update **Authentication → Email Templates** so the *Invite user* and *Reset password* links point to `/auth/confirm`. Copy the templates from `supabase/templates/`. They use `{{ .TokenHash }}`, which the `/auth/confirm` route verifies on the server.
+4. Update **Authentication → Email Templates** so the *Invite user*, *Reset password* and *Confirm signup* links point to `/auth/confirm`. Copy the templates from `supabase/templates/`. They use `{{ .TokenHash }}`, which the `/auth/confirm` route verifies on the server.
 
 The migrations create every table, RLS policy, workflow function, the private `submission-files` storage bucket, and the default configuration (backlink types and settings). They create **no** clients, campaigns or submissions.
 
@@ -90,7 +90,21 @@ Security is enforced in the database, not just by hiding UI:
   - File uploads are limited by MIME type and extension (max 10 MB) and stored in a private bucket with storage RLS. Downloads use 2-minute signed URLs.
   - Text exported to Excel/CSV is escaped against formula injection.
   - Security headers are set in `next.config.ts`.
+- **Self-registration and feature permissions** are covered in §2.1.
 - **The service role key is only used server-side** (`src/lib/supabase/admin.ts`, which imports `server-only`), and only after an explicit Super Admin check, or by the cron route after verifying `CRON_SECRET`.
+
+### 2.1 Registration, approval and feature access
+
+1. **Sign-up.** Anyone can create an account at `/signup`. After confirming their email they can sign in, but their profile is `pending` with **no role**. They see only an "awaiting administrator approval" page. `auth_role()` is null for them, so every RLS policy and RPC denies them data.
+2. **Approval.** In **Administration → Users & Access** the Super Admin approves or rejects each registration. Approving assigns a role (Intern or Client, plus a workspace or campaigns) and the features the account may use. This runs in one transaction (`approve_registration()`). Super Admin can never be granted from the app. A role is assigned once and can't be changed afterwards.
+3. **Features.** Each role has a catalog of features (`src/lib/permissions.ts`), for example *My Tasks*, *Create & edit submissions*, *Approve or reject content* and *Download reports*. A user either follows the **role defaults** (editable on the same page) or has an **explicit list**. Changes apply on the user's next request. Removing every feature revokes access without disabling the account. Existing and invited users follow the role defaults, which start with every feature, so nothing changes for them.
+4. **Enforcement.** The checks run in four places:
+   - **Database:** `my_permissions()` / `has_permission()`. The RPCs behind each feature check it: submission save/files/publication, task status, client decisions, the `client_portal_*` reads and the client reports policy.
+   - **Pages:** every page calls `requireRole(roles, feature)` and redirects to the user's first permitted page.
+   - **Server Actions and API routes:** these call `authorize(roles, feature)`.
+   - **UI:** the sidebar, search and in-page buttons only show permitted features. This is for convenience, not security.
+
+   Interns' direct table reads are still limited by RLS to their own assigned work. Per-feature limits on those reads are enforced in the app layer.
 
 ---
 

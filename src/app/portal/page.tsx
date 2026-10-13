@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { requireRole } from "@/lib/auth"
+import { can } from "@/lib/permissions"
 import { PageHeader, Section } from "@/components/shared/page-header"
 import { ProgressBar, StatCard } from "@/components/shared/stat-card"
 import { SubmissionStatusBadge } from "@/components/shared/status-badge"
@@ -11,7 +12,7 @@ import { portalCampaigns, portalClients, portalSubmissions } from "@/server/port
 export const metadata = { title: "Overview" }
 
 export default async function PortalHome() {
-  const { supabase, profile } = await requireRole(["client"])
+  const { supabase, profile, permissions } = await requireRole(["client"], "portal.overview")
   const [clients, queue, campaigns] = await Promise.all([portalClients(supabase), portalSubmissions(supabase, true), portalCampaigns(supabase)])
   if (clients.length === 0) return <EmptyState title="No workspace yet" description="Your account is not linked to a client workspace. Contact your agency." />
   const sum = (k: "month_submitted" | "month_client_approved" | "month_published" | "month_verified") => campaigns.reduce((a, c) => a + (c[k] ?? 0), 0)
@@ -21,8 +22,8 @@ export default async function PortalHome() {
     <>
       <PageHeader title={clients.map((c) => c.company_name).join(", ")} description={`Welcome, ${profile.full_name || profile.email}`} />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <StatCard label="Awaiting your approval" value={queue.length} tone={queue.length ? "warning" : "default"} href="/portal/approvals" />
-        <StatCard label="Active campaigns" value={campaigns.filter((c) => c.status === "active").length} href="/portal/campaigns" />
+        <StatCard label="Awaiting your approval" value={queue.length} tone={queue.length ? "warning" : "default"} href={can(permissions, "portal.approvals") ? "/portal/approvals" : undefined} />
+        <StatCard label="Active campaigns" value={campaigns.filter((c) => c.status === "active").length} href={can(permissions, "portal.campaigns") ? "/portal/campaigns" : undefined} />
         {showProgress ? (
           <>
             <StatCard label="Approved this month" value={sum("month_client_approved")} />
@@ -31,15 +32,20 @@ export default async function PortalHome() {
           </>
         ) : null}
       </div>
-      <Section title="Waiting for your review" bodyClassName="p-0" actions={queue.length ? <LinkButton href="/portal/approvals" variant="outline">Open queue</LinkButton> : null}>
+      <Section title="Waiting for your review" bodyClassName="p-0" actions={queue.length && can(permissions, "portal.approvals") ? <LinkButton href="/portal/approvals" variant="outline">Open queue</LinkButton> : null}>
         {queue.length === 0 ? <EmptyState title="You're all caught up" description="New content will appear here when it's ready for your approval." /> : (
           <ul>
             {queue.slice(0, 6).map((s) => (
               <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 last:border-0">
-                <Link href={`/portal/approvals/${s.id}`} className="min-w-0 hover:text-primary">
-                  <span className="font-medium">{s.content_title ?? s.proposed_website}</span>
-                  <span className="block text-xs text-muted-foreground">{s.campaign_code} · {s.backlink_type} · {s.proposed_website}</span>
-                </Link>
+                {can(permissions, "portal.approvals") ? (
+                  <Link href={`/portal/approvals/${s.id}`} className="min-w-0 hover:text-primary">
+                    <QueueItem s={s} />
+                  </Link>
+                ) : (
+                  <div className="min-w-0">
+                    <QueueItem s={s} />
+                  </div>
+                )}
                 <span className="flex items-center gap-2 text-xs text-muted-foreground">sent {formatDateTime(s.sent_to_client_at, tz)} <SubmissionStatusBadge status={s.status} /></span>
               </li>
             ))}
@@ -58,6 +64,15 @@ export default async function PortalHome() {
           </ul>
         </Section>
       ) : null}
+    </>
+  )
+}
+
+function QueueItem({ s }: { s: { content_title: string | null; proposed_website: string; campaign_code: string; backlink_type: string } }) {
+  return (
+    <>
+      <span className="font-medium">{s.content_title ?? s.proposed_website}</span>
+      <span className="block text-xs text-muted-foreground">{s.campaign_code} · {s.backlink_type} · {s.proposed_website}</span>
     </>
   )
 }

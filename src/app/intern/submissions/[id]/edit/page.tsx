@@ -8,7 +8,7 @@ import type { Submission } from "@/lib/types"
 
 export default async function EditSubmission({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { supabase, profile } = await requireRole(["intern"])
+  const { supabase, profile } = await requireRole(["intern"], "intern.submissions.manage")
   const { data } = await supabase.from("backlink_submissions").select("*").eq("id", id).eq("intern_id", profile.id).maybeSingle()
   if (!data) notFound()
   const s = data as Submission

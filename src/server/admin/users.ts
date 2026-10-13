@@ -121,6 +121,7 @@ export async function setUserStatus(profileId: string, status: "active" | "disab
     }
     revalidatePath("/admin/interns")
     revalidatePath("/admin/settings")
+    revalidatePath("/admin/users")
   }, status === "disabled" ? "User disabled" : "User re-enabled")
 }
 

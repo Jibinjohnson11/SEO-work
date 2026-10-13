@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { ShieldAlert } from "lucide-react"
 import { requireRole } from "@/lib/auth"
+import { can } from "@/lib/permissions"
 import { DetailList, PageHeader, Section } from "@/components/shared/page-header"
 import { LiveStatusBadge, SubmissionStatusBadge, ToneBadge } from "@/components/shared/status-badge"
 import { DecisionPanel } from "@/components/portal/decision-panel"
@@ -39,7 +40,7 @@ const link = (u: string | null) => (u ? <a href={u.startsWith("http") ? u : `htt
 export default async function PortalReview({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound()
-  const { supabase } = await requireRole(["client"])
+  const { supabase, permissions } = await requireRole(["client"], "portal.approvals")
   const { data, error } = await supabase.rpc("client_portal_submission", { p_id: id })
   if (error || !data) notFound()
   const d = data as PortalDetail
@@ -52,7 +53,7 @@ export default async function PortalReview({ params }: { params: Promise<{ id: s
   return (
     <>
       <PageHeader title={d.content_title ?? d.proposed_website} description={<span className="flex flex-wrap items-center gap-2">{d.code} · {d.campaign.name} <SubmissionStatusBadge status={d.status} /></span>} />
-      {d.status === "awaiting_client_approval" && d.can_approve ? (
+      {d.status === "awaiting_client_approval" && d.can_approve && can(permissions, "portal.approvals.decide") ? (
         <Section title="Your decision" className="border-primary/40">
           {changedSinceApproval.length ? <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">This content was revised after you approved version {d.client_approved_version}. Changed: {changedSinceApproval.map(humanize).join(", ")}.</p> : null}
           <DecisionPanel submissionId={d.id} version={d.current_version} />

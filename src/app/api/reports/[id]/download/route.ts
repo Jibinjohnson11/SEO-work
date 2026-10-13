@@ -8,7 +8,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params
   let session
   try {
-    session = await authorize(["super_admin", "client"])
+    session = await authorize(["super_admin", "client"], "portal.reports.download")
   } catch {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }

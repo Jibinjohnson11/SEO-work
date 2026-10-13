@@ -12,7 +12,11 @@
     "test:db": "vitest run tests/db",
     "test:unit": "vitest run tests/unit",
     "bootstrap:admin": "node --experimental-websocket --env-file=.env.local scripts/bootstrap-admin.mjs",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm test",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -49,6 +53,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.9",
+    "@opennextjs/cloudflare": "^1.20.11",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
@@ -56,8 +61,10 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
+    "patch-package": "^8.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "wrangler": "^4.150.0"
   }
 }

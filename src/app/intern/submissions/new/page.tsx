@@ -9,7 +9,7 @@ export const metadata = { title: "New Submission" }
 
 export default async function NewSubmission({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams
-  const { supabase, profile } = await requireRole(["intern"])
+  const { supabase, profile } = await requireRole(["intern"], "intern.submissions.manage")
   const options = await getInternFormOptions(supabase, profile.id)
   return (
     <>

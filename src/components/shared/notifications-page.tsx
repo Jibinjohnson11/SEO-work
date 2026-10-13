@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 import type { AppRole, Notification } from "@/lib/types"
 
 export async function NotificationsPage({ role }: { role: AppRole }) {
-  const { supabase, profile } = await requireRole([role])
+  const { supabase, profile } = await requireRole([role], { intern: "intern.notifications", client: "portal.notifications" })
   const { data } = await supabase.from("notifications").select("id, type, title, body, link, read_at, created_at").order("created_at", { ascending: false }).limit(200)
   const items = (data ?? []) as Notification[]
   const unread = items.filter((n) => !n.read_at).length

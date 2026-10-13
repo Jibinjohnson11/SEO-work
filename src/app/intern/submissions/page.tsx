@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Plus } from "lucide-react"
 import { requireRole } from "@/lib/auth"
+import { can } from "@/lib/permissions"
 import { PageHeader } from "@/components/shared/page-header"
 import { DataTable } from "@/components/shared/data-table"
 import { FilterBar } from "@/components/shared/filter-bar"
@@ -15,7 +16,7 @@ export const metadata = { title: "My Submissions" }
 
 export default async function InternSubmissions({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams
-  const { supabase, profile } = await requireRole(["intern"])
+  const { supabase, profile, permissions } = await requireRole(["intern"], "intern.submissions")
   let q = supabase.from("backlink_submissions").select("*, campaigns(code), backlink_types(name)").eq("intern_id", profile.id).order("updated_at", { ascending: false }).limit(2000)
   const status = param(sp, "status")
   if (status === "attention") q = q.in("status", ["draft", "internal_changes_requested", "client_changes_requested", "client_approved", "ready_for_publication"])
@@ -24,7 +25,7 @@ export default async function InternSubmissions({ searchParams }: { searchParams
   const subs = (data ?? []) as (Submission & { campaigns: { code: string }; backlink_types: { name: string } })[]
   return (
     <>
-      <PageHeader title="My Submissions" description="Your opportunities and drafts with their approval status and feedback." actions={<LinkButton href="/intern/submissions/new" variant="default"><Plus /> New submission</LinkButton>} />
+      <PageHeader title="My Submissions" description="Your opportunities and drafts with their approval status and feedback." actions={can(permissions, "intern.submissions.manage") ? <LinkButton href="/intern/submissions/new" variant="default"><Plus /> New submission</LinkButton> : null} />
       <FilterBar presets={presets} filters={[{ type: "select", key: "status", label: "Status", options: [{ value: "attention", label: "Needs my action" }, ...SUBMISSION_STATUSES.map((s) => ({ value: s, label: SUBMISSION_STATUS[s].label }))] }]} />
       <DataTable
         searchPlaceholder="Search code, website, title…"

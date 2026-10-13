@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "linkops",
+  // Custom entry: OpenNext's worker plus the scheduled (cron) handler.
+  "main": "cloudflare-worker.mjs",
+  "compatibility_date": "2026-10-01",
+  // global_fetch_strictly_public: outbound fetch() may only reach the public internet
+  // (part of the link checker's SSRF protection).
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "linkops" }],
+  // Daily job at 00:30 UTC (same as vercel.json): reminders, link verification, scheduled reports.
+  "triggers": { "crons": ["30 0 * * *"] },
+  "observability": { "enabled": true }
+  // Secrets (SUPABASE_SERVICE_ROLE_KEY, CRON_SECRET, ...) are set with `wrangler secret put`
+  // or the dashboard — never stored in this file.
+}

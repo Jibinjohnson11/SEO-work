@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth"
+import { can } from "@/lib/permissions"
 import { PageHeader } from "@/components/shared/page-header"
 import { DataTable } from "@/components/shared/data-table"
 import { FilterBar } from "@/components/shared/filter-bar"
@@ -14,7 +15,7 @@ export const metadata = { title: "My Tasks" }
 
 export default async function InternTasks({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams
-  const { supabase, profile } = await requireRole(["intern"])
+  const { supabase, profile, permissions } = await requireRole(["intern"], "intern.tasks")
   const tz = profile.timezone || (await getSetting("reports")).timezone
   const today = todayIn(tz)
   let q = supabase.from("tasks").select("*, campaigns(code, name), keywords(keyword), backlink_types(name)").eq("intern_id", profile.id).order("due_date", { ascending: true, nullsFirst: false })
@@ -50,7 +51,7 @@ export default async function InternTasks({ searchParams }: { searchParams: Prom
             due: t.due_date && t.due_date < today && !["completed", "cancelled"].includes(t.status) ? <ToneBadge tone="danger">{formatDay(t.due_date)}</ToneBadge> : formatDay(t.due_date),
             priority: <PriorityBadge priority={t.priority} />,
             status: <TaskStatusBadge status={t.status} />,
-            actions: <InternTaskButtons taskId={t.id} status={t.status} />,
+            actions: <InternTaskButtons taskId={t.id} status={t.status} canSubmit={can(permissions, "intern.submissions.manage")} />,
           },
         }))}
         empty={{ title: "No tasks", description: "You have no tasks in this view." }}

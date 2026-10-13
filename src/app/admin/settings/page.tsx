@@ -66,7 +66,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     body = (
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="max-w-2xl text-sm text-muted-foreground">Roles are fixed: Super Admin (full control), Intern (assigned campaigns only) and Client (own workspace only). Fine-grained permissions are set per client workspace (approve / download) and per client portal. Super Admin access can only be granted from the database — see README.</p>
+          <p className="max-w-2xl text-sm text-muted-foreground">Roles are fixed: Super Admin (full control), Intern (assigned campaigns only) and Client (own workspace only). Fine-grained permissions are set per client workspace (approve / download) and per client portal. Super Admin access can only be granted from the database — see README. Approve self-registered accounts and choose which features each user can use in <Link href="/admin/users" className="text-primary hover:underline">Users &amp; Access</Link>.</p>
           <InviteUserButton clients={lookups.clients.map((c) => ({ value: c.id, label: c.company_name }))} campaigns={lookups.campaigns.map((c) => ({ value: c.id, label: `${c.code} · ${c.name}` }))} defaults={settings.campaign_defaults}><UserPlus /> Invite user</InviteUserButton>
         </div>
         <DataTable
@@ -78,11 +78,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             sort: { name: u.full_name || u.email, role: u.role, last: u.last_sign_in_at, status: u.status },
             cells: {
               name: <span><span className="font-medium">{u.full_name || u.email}</span>{u.id === profile.id ? " (you)" : ""}<span className="block text-xs text-muted-foreground">{u.email}</span></span>,
-              role: <ToneBadge tone={u.role === "super_admin" ? "info" : "neutral"}>{u.role.replace("_", " ")}</ToneBadge>,
+              role: u.role ? <ToneBadge tone={u.role === "super_admin" ? "info" : "neutral"}>{u.role.replace("_", " ")}</ToneBadge> : <span className="text-muted-foreground">—</span>,
               scope: u.role === "client" ? clientOf(u.id) || "—" : u.role === "intern" ? <Link href={`/admin/interns/${u.id}`} className="text-primary hover:underline">Assignments</Link> : "Everything",
               last: formatDateTime(u.last_sign_in_at, settings.reports.timezone),
-              status: <ToneBadge tone={u.status === "active" ? "success" : u.status === "invited" ? "info" : "muted"}>{u.status}</ToneBadge>,
-              actions: u.role === "super_admin" ? null : <UserMenu user={u} />,
+              status: <ToneBadge tone={u.status === "active" ? "success" : u.status === "invited" ? "info" : u.status === "pending" ? "warning" : "muted"}>{u.status}</ToneBadge>,
+              actions: u.role === "super_admin" ? null : u.role === null ? <Link href="/admin/users?status=pending" className="text-xs text-primary hover:underline">Review</Link> : <UserMenu user={u} />,
             },
           }))}
         />

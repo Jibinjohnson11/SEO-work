@@ -9,7 +9,7 @@ import { portalCampaigns } from "@/server/portal"
 export const metadata = { title: "Campaigns" }
 
 export default async function PortalCampaigns() {
-  const { supabase } = await requireRole(["client"])
+  const { supabase } = await requireRole(["client"], "portal.campaigns")
   const campaigns = await portalCampaigns(supabase)
   return (
     <>

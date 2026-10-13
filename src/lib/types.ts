@@ -2,7 +2,7 @@
 // (or replace with `supabase gen types typescript` output once a project is linked).
 
 export type AppRole = "super_admin" | "intern" | "client"
-export type UserStatus = "invited" | "active" | "disabled"
+export type UserStatus = "invited" | "active" | "disabled" | "pending" | "rejected"
 export type ClientStatus = "active" | "paused" | "archived"
 export type CampaignStatus = "draft" | "active" | "paused" | "completed" | "archived"
 export type Priority = "low" | "medium" | "high" | "urgent"
@@ -45,8 +45,11 @@ export interface Profile {
   id: string
   email: string
   full_name: string
-  role: AppRole
+  /** Null only while a self-registered account is pending or rejected. */
+  role: AppRole | null
   status: UserStatus
+  /** Explicit feature keys; null = the role defaults (see src/lib/permissions.ts). */
+  permissions: string[] | null
   phone: string | null
   job_title: string | null
   avatar_url: string | null

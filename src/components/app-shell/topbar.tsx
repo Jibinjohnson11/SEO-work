@@ -30,6 +30,7 @@ import { globalSearch, type SearchHit } from "@/server/search"
 import { signOut } from "@/server/auth-actions"
 import { initials, timeAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { can } from "@/lib/permissions"
 import type { Notification } from "@/lib/types"
 import type { ShellUser } from "@/components/app-shell/app-shell"
 
@@ -64,13 +65,21 @@ export function Topbar({
         ))}
       </nav>
       <div className="flex flex-1 items-center justify-end gap-1 sm:flex-none">
-        <GlobalSearch />
-        <NotificationBell unread={unread} role={user.role} />
+        {canSearch(user) ? <GlobalSearch /> : null}
+        {user.role && (user.role === "super_admin" || can(user.permissions, user.role === "intern" ? "intern.notifications" : "portal.notifications")) ? (
+          <NotificationBell unread={unread} role={user.role} />
+        ) : null}
         <ThemeToggle />
         <UserMenu user={user} />
       </div>
     </header>
   )
+}
+
+function canSearch(user: ShellUser) {
+  if (user.role === "super_admin") return true
+  if (user.role === "intern") return (["intern.campaigns", "intern.submissions", "intern.tasks"] as const).some((f) => can(user.permissions, f))
+  return user.role === "client" && can(user.permissions, "portal.approvals")
 }
 
 function GlobalSearch() {
@@ -154,7 +163,7 @@ function GlobalSearch() {
   )
 }
 
-function NotificationBell({ unread, role }: { unread: number; role: ShellUser["role"] }) {
+function NotificationBell({ unread, role }: { unread: number; role: NonNullable<ShellUser["role"]> }) {
   const router = useRouter()
   const [items, setItems] = useState<Notification[] | null>(null)
   const [count, setCount] = useState(unread)
@@ -265,7 +274,7 @@ function ThemeToggle() {
 }
 
 function UserMenu({ user }: { user: ShellUser }) {
-  const profileHref = user.role === "super_admin" ? "/admin/profile" : user.role === "intern" ? "/intern/profile" : "/portal/profile"
+  const profileHref = user.role === "super_admin" ? "/admin/profile" : user.role === "intern" ? "/intern/profile" : user.role === "client" ? "/portal/profile" : null
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -281,8 +290,12 @@ function UserMenu({ user }: { user: ShellUser }) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem render={<Link href={profileHref} />}>Profile & security</DropdownMenuItem>
-        <DropdownMenuSeparator />
+        {profileHref ? (
+          <>
+            <DropdownMenuItem render={<Link href={profileHref} />}>Profile & security</DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuItem onClick={() => void signOut()}>
           <LogOut /> Sign out
         </DropdownMenuItem>

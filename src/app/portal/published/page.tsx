@@ -9,7 +9,7 @@ import { portalClients, portalPublished } from "@/server/portal"
 export const metadata = { title: "Published Backlinks" }
 
 export default async function PortalPublished() {
-  const { supabase } = await requireRole(["client"])
+  const { supabase } = await requireRole(["client"], "portal.published")
   const clients = await portalClients(supabase)
   if (!clients.some((c) => c.settings.show_published_backlinks)) return <EmptyState title="Not available" description="Your agency has not enabled this view for your workspace." />
   const rows = await portalPublished(supabase)

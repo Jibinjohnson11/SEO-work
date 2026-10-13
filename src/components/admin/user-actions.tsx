@@ -66,7 +66,7 @@ function InternEditForm({ profile, campaignIds, campaigns, onDone }: { profile: 
       daily_target: profile.daily_target,
       weekly_target: profile.weekly_target,
       monthly_target: profile.monthly_target,
-      status: profile.status,
+      status: profile.status as "active" | "invited" | "disabled",
       campaign_ids: campaignIds,
     },
   })

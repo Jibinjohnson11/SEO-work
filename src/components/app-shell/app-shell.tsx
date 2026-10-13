@@ -8,16 +8,20 @@ import { ChevronsLeft, ChevronsRight, Link2, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { NAV, breadcrumbsFor, type NavGroup } from "@/components/app-shell/nav"
+import { breadcrumbsFor, navFor, type NavGroup } from "@/components/app-shell/nav"
 import { Topbar } from "@/components/app-shell/topbar"
 import { IdleSignOut } from "@/components/app-shell/idle-sign-out"
 import { cn } from "@/lib/utils"
+import type { Permissions } from "@/lib/permissions"
 import type { AppRole } from "@/lib/types"
 
 export interface ShellUser {
   name: string
   email: string
-  role: AppRole
+  /** Null while the account is awaiting approval. */
+  role: AppRole | null
+  /** Effective features (["*"] for a Super Admin). The server enforces these; the shell only hides links. */
+  permissions: Permissions
 }
 
 export function AppShell({
@@ -32,7 +36,7 @@ export function AppShell({
   user: ShellUser
   platformName: string
   logoUrl?: string | null
-  badges: Partial<Record<"review" | "approvals" | "notifications" | "changes", number>>
+  badges: Partial<Record<"review" | "approvals" | "notifications" | "changes" | "registrations", number>>
   initialCollapsed: boolean
   idleTimeoutMinutes: number
   children: React.ReactNode
@@ -40,7 +44,7 @@ export function AppShell({
   const [collapsed, setCollapsed] = useState(initialCollapsed)
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
-  const groups = NAV[user.role]
+  const groups = navFor(user.role, user.permissions)
 
   // Close the mobile drawer after navigation (state adjusted during render, not in an effect).
   const [lastPath, setLastPath] = useState(pathname)
@@ -113,7 +117,7 @@ export function AppShell({
   )
 }
 
-function Brand({ name, logoUrl, collapsed, role }: { name: string; logoUrl?: string | null; collapsed: boolean; role: AppRole }) {
+function Brand({ name, logoUrl, collapsed, role }: { name: string; logoUrl?: string | null; collapsed: boolean; role: AppRole | null }) {
   return (
     <div className={cn("flex h-14 items-center gap-2 border-b px-3", collapsed && "justify-center px-0")}>
       {logoUrl ? (
@@ -128,7 +132,7 @@ function Brand({ name, logoUrl, collapsed, role }: { name: string; logoUrl?: str
         <div className="min-w-0 leading-tight">
           <div className="truncate text-sm font-semibold">{name}</div>
           <div className="text-[11px] text-muted-foreground">
-            {role === "super_admin" ? "Super Admin" : role === "intern" ? "Intern workspace" : "Client portal"}
+            {role === "super_admin" ? "Super Admin" : role === "intern" ? "Intern workspace" : role === "client" ? "Client portal" : "Awaiting approval"}
           </div>
         </div>
       )}

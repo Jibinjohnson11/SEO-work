@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth"
+import { can } from "@/lib/permissions"
 import { PageHeader } from "@/components/shared/page-header"
 import { EmptyState } from "@/components/shared/empty-state"
 import { formatDateTime, formatDay } from "@/lib/format"
@@ -9,13 +10,13 @@ import type { ReportRecord } from "@/lib/types"
 export const metadata = { title: "Reports" }
 
 export default async function PortalReports() {
-  const { supabase } = await requireRole(["client"])
+  const { supabase, permissions } = await requireRole(["client"], "portal.reports")
   const clients = await portalClients(supabase)
   const { data } = await supabase.from("reports").select("*").eq("status", "published").order("period_start", { ascending: false }).limit(100)
   const reports = (data ?? []) as ReportRecord[]
   const canDownload = (clientId: string | null) => {
     const c = clients.find((x) => x.id === clientId)
-    return Boolean(c?.can_download_reports && c.settings.allow_report_download)
+    return Boolean(c?.can_download_reports && c.settings.allow_report_download && can(permissions, "portal.reports.download"))
   }
   return (
     <>

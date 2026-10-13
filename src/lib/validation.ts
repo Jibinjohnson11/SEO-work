@@ -186,6 +186,25 @@ export const internUpdateSchema = z.object({
 })
 export type InternUpdateInput = z.infer<typeof internUpdateSchema>
 
+// Access control: features are validated against the catalog for the role on the server.
+const featureKeys = z.array(z.string().max(80)).max(50)
+
+export const approveUserSchema = z
+  .object({
+    role: z.enum(["intern", "client"]),
+    use_role_defaults: z.boolean(),
+    features: featureKeys,
+    client_id: optionalUuid,
+    can_approve: z.boolean(),
+    can_download_reports: z.boolean(),
+    campaign_ids: z.array(uuid),
+  })
+  .refine((v) => v.role !== "client" || v.client_id !== "", { message: "Choose the client workspace for this user", path: ["client_id"] })
+export type ApproveUserInput = z.infer<typeof approveUserSchema>
+
+export const userAccessSchema = z.object({ use_role_defaults: z.boolean(), features: featureKeys })
+export type UserAccessInput = z.infer<typeof userAccessSchema>
+
 export const submissionSchema = z.object({
   campaign_id: uuid,
   backlink_type_id: uuid,

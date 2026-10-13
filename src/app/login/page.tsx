@@ -1,6 +1,7 @@
+import Link from "next/link"
 import { redirect } from "next/navigation"
 import { AuthCard } from "@/components/auth-card"
-import { getSession, HOME_FOR_ROLE } from "@/lib/auth"
+import { getSession, landingFor } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/env"
 import { LoginForm } from "./login-form"
 
@@ -10,11 +11,22 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams
   if (!isSupabaseConfigured()) redirect("/setup")
   const session = await getSession()
-  if (session?.profile?.status === "active") redirect(HOME_FOR_ROLE[session.profile.role])
+  if (session?.profile && ["active", "pending", "rejected"].includes(session.profile.status)) redirect(landingFor(session.profile, session.permissions))
   const next = typeof sp.next === "string" ? sp.next : undefined
   const notice = sp.error === "link" ? "That link is invalid or has expired. Request a new one." : undefined
   return (
-    <AuthCard title="Sign in" description="Access is by invitation only." footer="Accounts are created by your administrator.">
+    <AuthCard
+      title="Sign in"
+      description="Sign in to your LinkOps workspace."
+      footer={
+        <>
+          New here?{" "}
+          <Link href="/signup" className="font-medium text-primary hover:underline">
+            Create an account
+          </Link>
+        </>
+      }
+    >
       <LoginForm next={next} notice={notice} />
     </AuthCard>
   )

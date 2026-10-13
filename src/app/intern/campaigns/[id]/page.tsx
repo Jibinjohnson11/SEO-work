@@ -2,6 +2,7 @@ import { LinkButton } from "@/components/ui/link-button"
 import { notFound } from "next/navigation"
 import { Plus } from "lucide-react"
 import { requireRole } from "@/lib/auth"
+import { can } from "@/lib/permissions"
 import { DetailList, PageHeader, Section } from "@/components/shared/page-header"
 import { StatCard } from "@/components/shared/stat-card"
 import { CampaignStatusBadge, ToneBadge } from "@/components/shared/status-badge"
@@ -14,7 +15,7 @@ import type { Campaign } from "@/lib/types"
 
 export default async function InternCampaign({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { supabase, profile } = await requireRole(["intern"])
+  const { supabase, profile, permissions } = await requireRole(["intern"], "intern.campaigns")
   const { data } = await supabase.from("campaigns").select("*, clients(company_name, timezone)").eq("id", id).maybeSingle()
   if (!data) notFound()
   const c = data as Campaign & { clients: { company_name: string; timezone: string } }
@@ -32,7 +33,7 @@ export default async function InternCampaign({ params }: { params: Promise<{ id:
   const keywords = (kw.data ?? []) as unknown as { is_primary: boolean; keywords: { keyword: string; target_url: string | null; search_intent: string | null } }[]
   return (
     <>
-      <PageHeader title={<span className="flex items-center gap-2">{c.code} · {c.name} <CampaignStatusBadge status={c.status} /></span>} description={c.clients.company_name} actions={c.status === "active" ? <LinkButton href={`/intern/submissions/new?campaign=${c.id}`} variant="default"><Plus /> New submission</LinkButton> : null} />
+      <PageHeader title={<span className="flex items-center gap-2">{c.code} · {c.name} <CampaignStatusBadge status={c.status} /></span>} description={c.clients.company_name} actions={c.status === "active" && can(permissions, "intern.submissions.manage") ? <LinkButton href={`/intern/submissions/new?campaign=${c.id}`} variant="default"><Plus /> New submission</LinkButton> : null} />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="My submissions this month" value={t.submitted} />
         <StatCard label="Client approved" value={t.client_approved} tone="success" />

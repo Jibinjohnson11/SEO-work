@@ -13,7 +13,7 @@ export const metadata = { title: "My Performance" }
 
 export default async function InternPerformanceSelf({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams
-  const { supabase, profile } = await requireRole(["intern"])
+  const { supabase, profile } = await requireRole(["intern"], "intern.performance")
   const tz = profile.timezone || (await getSetting("reports")).timezone
   const period = resolvePeriod(sp, tz, "last_30")
   const [metrics, data] = await Promise.all([

@@ -12,7 +12,7 @@ export const metadata = { title: "Approvals" }
 
 export default async function PortalApprovals({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams
-  const { supabase } = await requireRole(["client"])
+  const { supabase } = await requireRole(["client"], "portal.approvals")
   const view = param(sp, "view") || "queue"
   const [clients, subs] = await Promise.all([portalClients(supabase), portalSubmissions(supabase, view === "queue")])
   const tz = clients[0]?.timezone ?? "UTC"
