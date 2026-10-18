@@ -1,0 +1,45 @@
+{
+  "node": {
+    "00d006627f7a591684553203b9359dfb4f1dd54b11": {
+      "workers": {
+        "app/intern/campaigns/[id]/page": {
+          "moduleId": 33630,
+          "async": false
+        }
+      },
+      "exportedName": "getRecentNotifications",
+      "filename": "src/server/notifications.ts"
+    },
+    "40c9ce8b0112b8f79e57b74e0525d64fdac97093d9": {
+      "workers": {
+        "app/intern/campaigns/[id]/page": {
+          "moduleId": 33630,
+          "async": false
+        }
+      },
+      "exportedName": "markNotificationsRead",
+      "filename": "src/server/notifications.ts"
+    },
+    "40665a0bc5f13ac22fbd99021fa270a0f217b7d106": {
+      "workers": {
+        "app/intern/campaigns/[id]/page": {
+          "moduleId": 33630,
+          "async": false
+        }
+      },
+      "exportedName": "globalSearch",
+      "filename": "src/server/search.ts"
+    },
+    "0057db3d1222e51f7f97d854bfc06f2fa26b0fdc42": {
+      "workers": {
+        "app/intern/campaigns/[id]/page": {
+          "moduleId": 33630,
+          "async": false
+        }
+      },
+      "exportedName": "signOut",
+      "filename": "src/server/auth-actions.ts"
+    }
+  },
+  "edge": {}
+}
