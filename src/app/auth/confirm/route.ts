@@ -17,6 +17,16 @@ function defaultNext(type: string | null) {
   return type === "invite" || type === "recovery" ? "/auth/set-password" : "/"
 }
 
+/**
+ * Redirect with a RELATIVE Location, resolved by the browser against the public address it is on.
+ * Behind a proxy (e.g. Render), `request.url` is Next.js's internal address (http://localhost:PORT),
+ * so `new URL(path, request.url)` sent people to localhost after verifying an emailed link.
+ * `path` must already be a validated in-app path (safeRedirectPath or a fixed path).
+ */
+function redirectTo(path: string, status: 303 | 307 = 307) {
+  return new NextResponse(null, { status, headers: { Location: path } })
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const tokenHash = searchParams.get("token_hash")
@@ -24,9 +34,8 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code")
 
   if (tokenHash && type) {
-    const url = new URL("/auth/continue", request.url)
-    url.search = new URLSearchParams({ token_hash: tokenHash, type, next: safeRedirectPath(searchParams.get("next"), defaultNext(type)) }).toString()
-    return NextResponse.redirect(url)
+    const query = new URLSearchParams({ token_hash: tokenHash, type, next: safeRedirectPath(searchParams.get("next"), defaultNext(type)) })
+    return redirectTo(`/auth/continue?${query}`)
   }
 
   // PKCE code links can only be exchanged by the browser holding the code verifier cookie,
@@ -35,9 +44,9 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const ok = !(await supabase.auth.exchangeCodeForSession(code)).error
     const next = safeRedirectPath(searchParams.get("next"), "/")
-    return NextResponse.redirect(new URL(ok ? next : "/login?error=link", request.url))
+    return redirectTo(ok ? next : "/login?error=link")
   }
-  return NextResponse.redirect(new URL("/login?error=link", request.url))
+  return redirectTo("/login?error=link")
 }
 
 export async function POST(request: NextRequest) {
@@ -58,5 +67,5 @@ export async function POST(request: NextRequest) {
     ok = !(await supabase.auth.verifyOtp({ type, token_hash: tokenHash })).error
   }
   // 303 so the browser follows with GET.
-  return NextResponse.redirect(new URL(ok ? next : "/login?error=link", request.url), 303)
+  return redirectTo(ok ? next : "/login?error=link", 303)
 }
