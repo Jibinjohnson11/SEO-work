@@ -9,6 +9,10 @@ const eslintConfig = defineConfig([
   globalIgnores([
     ".open-next/**",
     ".wrangler/**",
+    // Staging build (scripts/staging-env.mjs) and Playwright output.
+    ".next-staging/**",
+    "test-results/**",
+    "playwright-report/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",

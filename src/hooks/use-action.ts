@@ -1,9 +1,11 @@
 "use client"
 
 import { useTransition } from "react"
-import { useRouter } from "next/navigation"
+import { unstable_rethrow, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import type { ActionResult } from "@/lib/actions"
+
+const CONNECTION_ERROR = "Connection problem — your change may not have been saved. Check your connection and try again."
 
 /** Runs a server action, shows a toast with the outcome and refreshes server data. */
 export function useAction() {
@@ -16,7 +18,16 @@ export function useAction() {
   ) {
     return new Promise<ActionResult<T>>((resolve) => {
       startTransition(async () => {
-        const result = await action()
+        let result: ActionResult<T>
+        try {
+          result = await action()
+        } catch (error) {
+          // Server actions return their own errors as results; a throw here means the request
+          // itself failed (offline, timeout, server crash). Next.js redirects pass through.
+          unstable_rethrow(error)
+          console.error("[action] request failed", error)
+          result = { ok: false, error: CONNECTION_ERROR }
+        }
         if (result.ok) {
           const msg = result.message ?? opts.success
           if (msg) toast.success(msg)

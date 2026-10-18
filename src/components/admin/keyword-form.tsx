@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { z } from "zod"
 import { MoreHorizontal } from "lucide-react"
@@ -53,7 +53,7 @@ function KeywordForm({ keyword, campaignIds, options, onDone }: { keyword?: Keyw
     },
   })
   const e = form.formState.errors
-  const clientId = form.watch("client_id")
+  const clientId = useWatch({ control: form.control, name: "client_id" })
   const campaigns = useMemo(() => options.campaigns.filter((c) => c.client_id === clientId), [options.campaigns, clientId])
   return (
     <form noValidate className="space-y-4" onSubmit={form.handleSubmit(async (v) => { const r = await execute(() => saveKeyword(keyword?.id ?? null, v)); if (r.ok) onDone() })}>

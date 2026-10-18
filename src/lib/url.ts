@@ -31,8 +31,23 @@ export function isHttpUrl(input: string | null | undefined): boolean {
   return /^https?:\/\/[^\s/?#]+\.[^\s/?#]+([/?#]\S*)?$/i.test((input ?? "").trim())
 }
 
-/** Allows only relative in-app paths (prevents open redirects through ?next=). */
+// Characters a redirect target may never contain. Browsers and the WHATWG URL parser silently drop
+// tab/CR/LF ("/\t/evil.com" becomes "//evil.com", another site) and treat "\\" like "/", so these are
+// refused outright, together with every other control, whitespace and invisible formatting character.
+const UNSAFE_REDIRECT_CHARS = /[\u0000-\u0020\u007F-\u00A0\u00AD\u1680\u180E\u2000-\u200F\u2028-\u202F\u205F-\u2064\u3000\uFEFF\\]/
+const REDIRECT_BASE = "http://redirect-check.invalid"
+
+/**
+ * Allows only relative in-app paths such as "/admin/clients?status=active" (prevents open
+ * redirects through ?next=). Anything else, including absolute and protocol-relative URLs, returns
+ * `fallback`. As a final check the path is resolved the way a browser would and must stay on this origin.
+ */
 export function safeRedirectPath(input: string | null | undefined, fallback = "/"): string {
-  if (!input || !input.startsWith("/") || input.startsWith("//") || input.includes("\\")) return fallback
+  if (!input || input.length > 2048 || !input.startsWith("/") || input.startsWith("//") || UNSAFE_REDIRECT_CHARS.test(input)) return fallback
+  try {
+    if (new URL(input, REDIRECT_BASE).origin !== REDIRECT_BASE) return fallback
+  } catch {
+    return fallback
+  }
   return input
 }

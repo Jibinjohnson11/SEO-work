@@ -231,6 +231,12 @@ export const submissionSchema = z.object({
 })
 export type SubmissionInput = z.infer<typeof submissionSchema>
 
+/** Super Admin edit of a submission's content (also used by the edit form in the browser). */
+export const adminEditSchema = submissionSchema
+  .pick({ proposed_website: true, placement_url: true, target_url: true, anchor_text: true, content_title: true, content_draft: true, notes: true, link_attribute: true })
+  .extend({ change_summary: z.string().trim().max(500) })
+export type AdminEditInput = z.infer<typeof adminEditSchema>
+
 export const internalReviewSchema = z
   .object({
     decision: z.enum(["approved", "changes_requested", "rejected"]),

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { z } from "zod"
 import { Button } from "@/components/ui/button"
@@ -88,7 +88,7 @@ function CampaignForm({ campaign, relations, options, presetClientId, onDone }: 
     },
   })
   const e = form.formState.errors
-  const clientId = form.watch("client_id")
+  const clientId = useWatch({ control: form.control, name: "client_id" })
   const clientKeywords = useMemo(() => options.keywords.filter((k) => k.client_id === clientId), [options.keywords, clientId])
 
   const tristate = (name: "is_medical" | "require_internal_review" | "require_client_approval", label: string) => (

@@ -152,7 +152,9 @@ function ApproveForm({
 }) {
   const { pending, execute } = useAction()
   const [role, setRole] = useState<AssignableRole>("intern")
-  const [useDefaults, setUseDefaults] = useState(false)
+  // Start from the role's default features, like invited users. Admins can still switch this off
+  // and choose individual features, including none.
+  const [useDefaults, setUseDefaults] = useState(true)
   const [features, setFeatures] = useState<string[]>([])
   const [clientId, setClientId] = useState("")
   const [canApprove, setCanApprove] = useState(true)

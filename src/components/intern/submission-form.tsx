@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { z } from "zod"
 import { Button } from "@/components/ui/button"
@@ -55,8 +55,8 @@ export function SubmissionForm({ options, submission, preset }: { options: Inter
     },
   })
   const e = form.formState.errors
-  const campaignId = form.watch("campaign_id")
-  const typeId = form.watch("backlink_type_id")
+  const campaignId = useWatch({ control: form.control, name: "campaign_id" })
+  const typeId = useWatch({ control: form.control, name: "backlink_type_id" })
   const campaign = options.campaigns.find((c) => c.id === campaignId)
   const allowedTypes = useMemo(() => options.types.filter((t) => !campaign || campaign.type_ids.length === 0 || campaign.type_ids.includes(t.id)), [options.types, campaign])
   const required = new Set(options.types.find((t) => t.id === typeId)?.required_fields ?? [])

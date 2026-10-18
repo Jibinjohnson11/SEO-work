@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest"
 import { randomUUID } from "node:crypto"
 import { FEATURES } from "@/lib/permissions"
-import { asSystem, asUser, createDb, createUser, type Db } from "./harness"
+import { asService, asSystem, asUser, createDb, createUser, type Db } from "./harness"
 
 // Self-registration, approval and feature-level permissions, enforced by the database.
 
@@ -173,5 +173,64 @@ describe("approval and feature permissions", () => {
     expect(m.can_approve).toBe(false)
     // permissions = null -> role defaults (changed above)
     expect((await perms(ids.rejected)).sort()).toEqual(["portal.approvals", "portal.campaigns"])
+  })
+})
+
+describe("accepting an invitation (regression: invited users could not sign in)", () => {
+  it.each(["super_admin", "intern", "client"] as const)("an invited %s is activated by their first sign-in", async (role) => {
+    const id = await createUser(db, role, `Invited ${role}`, "invited")
+    await asUser(db, id)
+    expect(await one("select record_sign_in() as role")).toEqual({ role })
+    expect(await one("select status from profiles where id = $1", [id])).toEqual({ status: "active" })
+  })
+
+  it("activation cannot be combined with any other change", async () => {
+    const id = await createUser(db, "intern", "Invited Sneaky", "invited")
+    await asUser(db, id)
+    await fails("update profiles set status = 'active', daily_target = 99 where id = $1", [id], /Only a Super Admin/)
+    await fails("update profiles set status = 'active', permissions = '{intern.tasks}' where id = $1", [id], /Only a Super Admin/)
+  })
+
+  it("an invited user cannot activate someone else", async () => {
+    const other = await createUser(db, "intern", "Invited Other", "invited")
+    const id = await createUser(db, "intern", "Invited Actor", "invited")
+    await asUser(db, id)
+    // RLS hides the other profile, so the update matches nothing.
+    await db.query("update profiles set status = 'active' where id = $1", [other])
+    await asSystem(db)
+    expect(await one("select status from profiles where id = $1", [other])).toEqual({ status: "invited" })
+  })
+
+  it("pending, rejected and disabled users still cannot activate themselves", async () => {
+    const pending = await selfSignup("StillPending")
+    await asUser(db, pending)
+    await fails("update profiles set status = 'active' where id = $1", [pending], /Only a Super Admin/)
+    const disabled = await createUser(db, "intern", "Disabled Self", "disabled")
+    await asUser(db, disabled)
+    expect(await one("select record_sign_in() as role")).toEqual({ role: null })
+    await asSystem(db)
+    expect(await one("select status from profiles where id = $1", [disabled])).toEqual({ status: "disabled" })
+  })
+})
+
+describe("rate limiter (regression: callable by anyone with caller-chosen limits)", () => {
+  it("anonymous and signed-in callers cannot use it", async () => {
+    await asSystem(db)
+    await db.exec("set role anon")
+    await fails("select check_rate_limit('login:email:victim@example.test', 1, 0)", [], /permission denied/)
+    await asUser(db, ids.intern)
+    await fails("select check_rate_limit('login:email:victim@example.test', 1, 0)", [], /permission denied/)
+  })
+
+  it("the server (service role) can use it, and old rows are purged", async () => {
+    await asService(db)
+    const r = await one("select check_rate_limit('t', 1, 900) as a, check_rate_limit('t', 1, 900) as b")
+    expect(r).toEqual({ a: true, b: false })
+    await asSystem(db)
+    await db.query("insert into rate_limits (key, window_start, count) values ('stale', now() - interval '2 days', 3)")
+    await asService(db)
+    expect(await one("select purge_rate_limits() as n")).toEqual({ n: 1 })
+    await asSystem(db)
+    expect((await db.query("select key from rate_limits order by key")).rows).toEqual([{ key: "t" }])
   })
 })

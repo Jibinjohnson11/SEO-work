@@ -27,10 +27,64 @@ describe("availableActions", () => {
 
 describe("safeRedirectPath", () => {
   it.each([
+    // valid in-app destinations are kept exactly
     ["/admin/clients", "/admin/clients"],
-    ["//evil.com", "/"],
-    ["https://evil.com", "/"],
-    ["/\\evil.com", "/"],
-    [null, "/"],
-  ])("%s → %s", (input, expected) => expect(safeRedirectPath(input)).toBe(expected))
+    ["/auth/set-password", "/auth/set-password"],
+    ["/access", "/access"],
+    ["/intern/submissions/3f0c2a9e-1b2c-4d5e-8f90-123456789abc", "/intern/submissions/3f0c2a9e-1b2c-4d5e-8f90-123456789abc"],
+    ["/admin/users?status=pending&q=a%20b", "/admin/users?status=pending&q=a%20b"],
+    ["/portal/reports#latest", "/portal/reports#latest"],
+    ["/admin/verification?q=https://publisher.example/page", "/admin/verification?q=https://publisher.example/page"],
+    ["/%2F%2Fevil.com", "/%2F%2Fevil.com"], // percent-encoded: stays a path on this site
+    ["/", "/"],
+  ])("keeps %s", (input, expected) => expect(safeRedirectPath(input)).toBe(expected))
+
+  it.each([
+    // external and protocol-relative URLs
+    "https://evil.com",
+    "http://evil.com/admin",
+    "//evil.com",
+    "///evil.com",
+    "javascript:alert(1)",
+    "data:text/html,<script>alert(1)</script>",
+    "evil.com/admin",
+    "admin",
+    // characters browsers strip or rewrite, which would turn the path into //evil.com
+    "/\tevil.com",
+    "/\t/evil.com",
+    "/\n/evil.com",
+    "/\r/evil.com",
+    "/\r\n/evil.com",
+    "\t//evil.com",
+    "/\\evil.com",
+    "/\\/evil.com",
+    "\\\\evil.com",
+    // other control, whitespace and invisible characters
+    "/\u0000/evil.com",
+    "/\u001f/evil.com",
+    "/\u007f/evil.com",
+    "/ /evil.com",
+    "/admin clients",
+    "/\u00a0/evil.com",
+    "/\u200b/evil.com",
+    "/\u2028/evil.com",
+    "/\u202e/evil.com",
+    "/\ufeff/evil.com",
+    // empty and oversized
+    "",
+    "/" + "a".repeat(2048),
+  ])("refuses %j", (input) => expect(safeRedirectPath(input, "/fallback")).toBe("/fallback"))
+
+  it("falls back for null and undefined", () => {
+    expect(safeRedirectPath(null)).toBe("/")
+    expect(safeRedirectPath(undefined, "/auth/set-password")).toBe("/auth/set-password")
+  })
+
+  it("never lets an accepted value resolve to another origin (as browsers resolve it)", () => {
+    for (let c = 0; c <= 0xffff; c++) {
+      const candidate = `/${String.fromCharCode(c)}/evil.com`
+      const out = safeRedirectPath(candidate, "/fallback")
+      expect(new URL(out, "https://app.linkops.example").origin, JSON.stringify(candidate)).toBe("https://app.linkops.example")
+    }
+  })
 })
