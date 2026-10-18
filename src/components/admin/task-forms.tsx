@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { z } from "zod"
 import { MoreHorizontal } from "lucide-react"
@@ -52,8 +52,8 @@ function AssignForm({ options, onDone }: { options: TaskOptions; onDone: () => v
     defaultValues: { title: "", intern_ids: [], campaign_ids: [], keyword_id: "", backlink_type_id: "", cadence: "daily", target_quantity: 5, start_date: options.today, due_date: "", priority: "medium", instructions: "" },
   })
   const e = form.formState.errors
-  const campaignIds = form.watch("campaign_ids")
-  const interns = form.watch("intern_ids")
+  const campaignIds = useWatch({ control: form.control, name: "campaign_ids" })
+  const interns = useWatch({ control: form.control, name: "intern_ids" })
   const keywords = useMemo(() => (campaignIds.length === 1 ? options.keywords.filter((k) => k.campaign_ids.includes(campaignIds[0])) : []), [campaignIds, options.keywords])
   const total = interns.length * campaignIds.length
   return (

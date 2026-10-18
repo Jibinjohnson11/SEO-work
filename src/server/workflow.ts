@@ -6,11 +6,13 @@ import { z } from "zod"
 import { authorize } from "@/lib/auth"
 import { must, run } from "@/lib/actions"
 import {
+  adminEditSchema,
   clientDecisionSchema,
   internalReviewSchema,
   manualVerificationSchema,
   publicationSchema,
   submissionSchema,
+  type AdminEditInput,
   type InternalReviewInput,
   type SubmissionInput,
 } from "@/lib/validation"
@@ -191,11 +193,7 @@ export async function archiveSubmission(submissionId: string, reason: string) {
   }, "Submission archived")
 }
 
-const adminEditSchema = submissionSchema
-  .pick({ proposed_website: true, placement_url: true, target_url: true, anchor_text: true, content_title: true, content_draft: true, notes: true, link_attribute: true })
-  .extend({ change_summary: z.string().trim().max(500) })
-
-export async function adminEditSubmission(submissionId: string, input: z.infer<typeof adminEditSchema>) {
+export async function adminEditSubmission(submissionId: string, input: AdminEditInput) {
   return run(async () => {
     const { change_summary, ...data } = adminEditSchema.parse(input)
     const { supabase } = await authorize(["super_admin"])

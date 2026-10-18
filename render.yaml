@@ -1,0 +1,57 @@
+# Render Blueprint for LinkOps — https://render.com/docs/blueprint-spec
+# Creates the web app and the daily job. Secrets are declared with `sync: false`, so Render asks for
+# them in the dashboard when the Blueprint is applied; no secret value is ever stored in this file.
+services:
+  - type: web
+    name: linkops
+    runtime: node
+    region: singapore # closest Render region to the Supabase project (ap-northeast-2, Seoul)
+    plan: starter # always on; the free plan sleeps after 15 min idle (about 1 min to wake)
+    branch: main
+    autoDeployTrigger: checksPass # deploy only after GitHub CI (typecheck, lint, tests, build) passes
+    buildCommand: npm ci && npm run build # NEXT_PUBLIC_* values are compiled in, so they must be set before the first build
+    startCommand: npm start # next start: listens on $PORT, all interfaces
+    healthCheckPath: /api/health # 200 only when the app is configured and Supabase answers
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY # the publishable key
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY # the secret key; server only
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL # e.g. https://linkops.onrender.com or your custom domain
+        sync: false
+      - key: CRON_SECRET
+        generateValue: true # random value created by Render; shared with the cron job below
+      - key: CLIENT_IP_HEADER # set after the first deploy, once the trusted header is confirmed
+        sync: false
+      - key: RESEND_API_KEY # optional: notification digests and scheduled report emails
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+
+  - type: cron
+    name: linkops-daily
+    runtime: node
+    region: singapore
+    plan: starter
+    schedule: "30 0 * * *" # 00:30 UTC daily, same as vercel.json / wrangler.jsonc
+    branch: main
+    buildCommand: node --version # nothing to build: the job only calls the web app
+    # Fails (non-zero exit) when the app reports a failed step (HTTP 500), so Render marks the run failed.
+    startCommand: >-
+      node -e 'fetch(process.env.APP_URL + "/api/cron/daily", { headers: { Authorization: "Bearer " + process.env.CRON_SECRET }, signal: AbortSignal.timeout(330000) })
+      .then(async (r) => { console.log(r.status, (await r.text()).slice(0, 4000)); process.exit(r.ok ? 0 : 1) })
+      .catch((e) => { console.error("cron call failed:", e.message); process.exit(1) })'
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: APP_URL # same value as NEXT_PUBLIC_APP_URL on the web service
+        sync: false
+      - key: CRON_SECRET
+        fromService:
+          type: web
+          name: linkops
+          envVarKey: CRON_SECRET

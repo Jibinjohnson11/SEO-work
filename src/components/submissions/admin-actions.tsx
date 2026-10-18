@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { Archive, Pencil, Send, ShieldAlert, UserRoundCog, Eye, CheckCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +13,7 @@ import { FormActions, FormDialog } from "@/components/shared/form-dialog"
 import { useAction } from "@/hooks/use-action"
 import { adminEditSubmission, adminOverride, archiveSubmission, markReady, reassignSubmission, sendToClient, startReview } from "@/server/workflow"
 import type { SubmissionAction } from "@/lib/workflow"
+import { adminEditSchema, type AdminEditInput } from "@/lib/validation"
 import type { Submission } from "@/lib/types"
 
 export function AdminActions({ submission, actions, interns }: { submission: Submission; actions: SubmissionAction[]; interns: { id: string; label: string }[] }) {
@@ -75,7 +77,8 @@ function ReassignButton({ id, interns }: { id: string; interns: { id: string; la
 function EditContentButton({ submission }: { submission: Submission }) {
   const [open, setOpen] = useState(false)
   const { pending, execute } = useAction()
-  const form = useForm({
+  const form = useForm<AdminEditInput>({
+    resolver: zodResolver(adminEditSchema),
     defaultValues: {
       proposed_website: submission.proposed_website,
       placement_url: submission.placement_url ?? "",
@@ -88,6 +91,7 @@ function EditContentButton({ submission }: { submission: Submission }) {
       change_summary: "",
     },
   })
+  const e = form.formState.errors
   const approved = ["client_approved", "ready_for_publication"].includes(submission.status)
   return (
     <>
@@ -95,16 +99,16 @@ function EditContentButton({ submission }: { submission: Submission }) {
       <FormDialog open={open} onOpenChange={setOpen} title={`Edit ${submission.code}`} description={approved ? "Material changes to approved content create a new version and send it back to the client for re-approval (per workflow settings)." : "Material changes create a new version in the history."} wide>
         <form className="space-y-4" onSubmit={form.handleSubmit(async (v) => { const r = await execute(() => adminEditSubmission(submission.id, v)); if (r.ok) setOpen(false) })}>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Proposed website" htmlFor="e-site"><Input id="e-site" {...form.register("proposed_website")} /></Field>
-            <Field label="Placement URL" htmlFor="e-place"><Input id="e-place" {...form.register("placement_url")} /></Field>
-            <Field label="Target URL" htmlFor="e-target"><Input id="e-target" {...form.register("target_url")} /></Field>
-            <Field label="Anchor text" htmlFor="e-anchor"><Input id="e-anchor" {...form.register("anchor_text")} /></Field>
+            <Field label="Proposed website" required htmlFor="e-site" error={e.proposed_website?.message}><Input id="e-site" {...form.register("proposed_website")} /></Field>
+            <Field label="Placement URL" htmlFor="e-place" error={e.placement_url?.message}><Input id="e-place" {...form.register("placement_url")} /></Field>
+            <Field label="Target URL" required htmlFor="e-target" error={e.target_url?.message}><Input id="e-target" {...form.register("target_url")} /></Field>
+            <Field label="Anchor text" htmlFor="e-anchor" error={e.anchor_text?.message}><Input id="e-anchor" {...form.register("anchor_text")} /></Field>
           </div>
-          <Field label="Content title" htmlFor="e-title"><Input id="e-title" {...form.register("content_title")} /></Field>
-          <Field label="Content draft" htmlFor="e-draft"><Textarea id="e-draft" rows={10} {...form.register("content_draft")} /></Field>
+          <Field label="Content title" htmlFor="e-title" error={e.content_title?.message}><Input id="e-title" {...form.register("content_title")} /></Field>
+          <Field label="Content draft" htmlFor="e-draft" error={e.content_draft?.message}><Textarea id="e-draft" rows={10} {...form.register("content_draft")} /></Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Internal notes" htmlFor="e-notes"><Textarea id="e-notes" rows={2} {...form.register("notes")} /></Field>
-            <Field label="Change summary" htmlFor="e-summary" hint="Shown in version history"><Textarea id="e-summary" rows={2} {...form.register("change_summary")} /></Field>
+            <Field label="Internal notes" htmlFor="e-notes" error={e.notes?.message}><Textarea id="e-notes" rows={2} {...form.register("notes")} /></Field>
+            <Field label="Change summary" htmlFor="e-summary" error={e.change_summary?.message} hint="Shown in version history"><Textarea id="e-summary" rows={2} {...form.register("change_summary")} /></Field>
           </div>
           <FormActions>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

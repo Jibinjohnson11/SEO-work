@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { AuthCard } from "@/components/auth-card"
 import { getSession, landingFor } from "@/lib/auth"
 import { isSupabaseConfigured } from "@/lib/env"
+import { safeRedirectPath } from "@/lib/url"
 import { LoginForm } from "./login-form"
 
 export const metadata = { title: "Sign in" }
@@ -12,7 +13,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (!isSupabaseConfigured()) redirect("/setup")
   const session = await getSession()
   if (session?.profile && ["active", "pending", "rejected"].includes(session.profile.status)) redirect(landingFor(session.profile, session.permissions))
-  const next = typeof sp.next === "string" ? sp.next : undefined
+  // Only an in-app path is carried into the form; signIn() checks it again before redirecting.
+  const next = safeRedirectPath(typeof sp.next === "string" ? sp.next : "", "") || undefined
   const notice = sp.error === "link" ? "That link is invalid or has expired. Request a new one." : undefined
   return (
     <AuthCard

@@ -4,35 +4,61 @@ import { headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { ACCESS_PAGE, HOME_FOR_ROLE, landingForClient } from "@/lib/auth"
-import { publicEnv } from "@/lib/env"
+import { appOrigin } from "@/lib/app-url"
+import { describeError } from "@/lib/actions"
+import { BLOCKED_RECIPIENT_MESSAGE, emailAllowlist, isAllowedRecipient } from "@/lib/email-allowlist"
+import { clientIpFrom, trustedIpSource } from "@/lib/client-ip"
 import { safeRedirectPath } from "@/lib/url"
 import type { AppRole } from "@/lib/types"
 
-type FormState = { error?: string; message?: string } | undefined
+type FormState = { error?: string; message?: string; unconfirmedEmail?: string } | undefined
 
+/**
+ * The client IP, read only from a header a trusted proxy controls (see src/lib/client-ip.ts), or
+ * null. Without a trusted source, IP-based limits are skipped rather than putting every visitor in
+ * one shared bucket (which would let anyone lock everybody out); per-email limits always apply.
+ */
 async function clientIp() {
   const h = await headers()
-  return (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip") || "unknown"
+  return clientIpFrom((name) => h.get(name), trustedIpSource())
 }
 
+/** Applies an IP-keyed limit only when the client IP is known from a trusted source. */
+async function ipLimited(prefix: string, ip: string | null, limit: number, windowSeconds: number) {
+  return ip !== null && (await rateLimited(`${prefix}:${ip}`, limit, windowSeconds))
+}
+
+/**
+ * Fixed-window limiter in the database. Only the server can call it (service role), so callers
+ * on the internet cannot pick the key, limit or window.
+ */
 async function rateLimited(key: string, limit: number, windowSeconds: number) {
-  const supabase = await createClient()
-  const { data, error } = await supabase.rpc("check_rate_limit", {
-    p_key: key,
-    p_limit: limit,
-    p_window_seconds: windowSeconds,
-  })
-  if (error) return false // never lock users out because the limiter itself failed
-  return data === false
+  try {
+    const { data, error } = await createAdminClient().rpc("check_rate_limit", {
+      p_key: key,
+      p_limit: limit,
+      p_window_seconds: windowSeconds,
+    })
+    if (error) throw error
+    return data === false
+  } catch (error) {
+    // Never lock users out because the limiter itself failed; Supabase Auth's own limits still apply.
+    console.error("[rateLimit] limiter unavailable", describeError(error))
+    return false
+  }
 }
 
-async function appOrigin() {
-  if (publicEnv.appUrl) return publicEnv.appUrl.replace(/\/$/, "")
-  const h = await headers()
-  const host = h.get("x-forwarded-host") ?? h.get("host")
-  const proto = h.get("x-forwarded-proto") ?? "https"
-  return `${proto}://${host}`
+const LINKS_UNCONFIGURED = "Email links are not configured on the server (NEXT_PUBLIC_APP_URL). Contact your administrator."
+
+async function linkOrigin() {
+  try {
+    return await appOrigin()
+  } catch (error) {
+    console.error("[auth] cannot build email links", describeError(error))
+    return null
+  }
 }
 
 const signInSchema = z.object({ email: z.email(), password: z.string().min(1) })
@@ -42,7 +68,7 @@ export async function signIn(_prev: FormState, formData: FormData): Promise<Form
   if (!parsed.success) return { error: "Enter your email and password." }
   const email = parsed.data.email.toLowerCase()
   const ip = await clientIp()
-  if ((await rateLimited(`login:ip:${ip}`, 20, 900)) || (await rateLimited(`login:email:${email}`, 8, 900)))
+  if ((await ipLimited("login:ip", ip, 20, 900)) || (await rateLimited(`login:email:${email}`, 8, 900)))
     return { error: "Too many sign-in attempts. Wait 15 minutes and try again." }
 
   const supabase = await createClient()
@@ -51,7 +77,8 @@ export async function signIn(_prev: FormState, formData: FormData): Promise<Form
     // Server log only (never the password); the user always sees the same generic message.
     console.warn("[signIn] auth rejected", { status: error.status, code: error.code })
     // Only reachable with the correct password, so this does not reveal whether an email exists.
-    if (error.code === "email_not_confirmed") return { error: "Confirm your email address first — use the link we emailed you." }
+    if (error.code === "email_not_confirmed")
+      return { error: "Confirm your email address first — use the link we emailed you.", unconfirmedEmail: email }
     return { error: "Invalid email or password." }
   }
 
@@ -102,15 +129,19 @@ export async function signUp(_prev: FormState, formData: FormData): Promise<Form
   })
   if (!parsed.success) return { error: parsed.error.issues[0].message }
   const email = parsed.data.email.toLowerCase()
-  if (await rateLimited(`signup:ip:${await clientIp()}`, 5, 3600))
+  if ((await ipLimited("signup:ip", await clientIp(), 5, 3600)) || (await rateLimited(`signup:email:${email}`, 3, 3600)))
     return { error: "Too many sign-up attempts. Try again later." }
+  // Non-production only (EMAIL_ALLOWED_RECIPIENTS set): never let Supabase email an outside address.
+  if (!isAllowedRecipient(email, emailAllowlist())) return { error: BLOCKED_RECIPIENT_MESSAGE }
 
+  const origin = await linkOrigin()
+  if (!origin) return { error: LINKS_UNCONFIGURED }
   const supabase = await createClient()
   const { data, error } = await supabase.auth.signUp({
     email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: `${await appOrigin()}/auth/confirm?next=${ACCESS_PAGE}`,
+      emailRedirectTo: `${origin}/auth/confirm?next=${ACCESS_PAGE}`,
       data: { full_name: parsed.data.full_name, self_signup: true },
     },
   })
@@ -125,6 +156,29 @@ export async function signUp(_prev: FormState, formData: FormData): Promise<Form
   if (data.session) redirect(ACCESS_PAGE)
   // Same response whether or not the email was already registered.
   return { message: "Check your email to confirm your address. After that, an administrator will review your account." }
+}
+
+/**
+ * Re-sends the sign-up confirmation email. Offered on the sign-in form only after a correct
+ * password for an unconfirmed account, and always answers the same way so it reveals nothing.
+ */
+export async function resendConfirmation(_prev: FormState, formData: FormData): Promise<FormState> {
+  const email = z.email().safeParse(String(formData.get("email") ?? "").toLowerCase())
+  if (!email.success) return { error: "Enter a valid email." }
+  if ((await rateLimited(`resend:email:${email.data}`, 3, 3600)) || (await ipLimited("resend:ip", await clientIp(), 10, 3600)))
+    return { error: "Too many requests. Try again in an hour." }
+  const origin = await linkOrigin()
+  if (!origin) return { error: LINKS_UNCONFIGURED }
+  const supabase = await createClient()
+  // Outside the allowlist (non-production only): send nothing, answer the same way.
+  if (!isAllowedRecipient(email.data, emailAllowlist())) return { message: "If that account still needs confirming, a new link is on its way. Check your spam folder too." }
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: email.data,
+    options: { emailRedirectTo: `${origin}/auth/confirm?next=${ACCESS_PAGE}` },
+  })
+  if (error) console.warn("[resendConfirmation] rejected", { status: error.status, code: error.code })
+  return { message: "If that account still needs confirming, a new link is on its way. Check your spam folder too." }
 }
 
 export async function signOut() {
@@ -142,12 +196,16 @@ export async function signOutEverywhere() {
 export async function requestPasswordReset(_prev: FormState, formData: FormData): Promise<FormState> {
   const email = z.email().safeParse(String(formData.get("email") ?? "").toLowerCase())
   if (!email.success) return { error: "Enter a valid email." }
-  if (await rateLimited(`reset:${await clientIp()}`, 5, 3600))
+  if ((await ipLimited("reset:ip", await clientIp(), 5, 3600)) || (await rateLimited(`reset:email:${email.data}`, 3, 3600)))
     return { error: "Too many requests. Try again later." }
+  const origin = await linkOrigin()
+  if (!origin) return { error: LINKS_UNCONFIGURED }
   const supabase = await createClient()
-  await supabase.auth.resetPasswordForEmail(email.data, {
-    redirectTo: `${await appOrigin()}/auth/confirm?next=/auth/set-password`,
-  })
+  // Outside the allowlist (non-production only) nothing is sent; the answer is the same either way.
+  if (isAllowedRecipient(email.data, emailAllowlist()))
+    await supabase.auth.resetPasswordForEmail(email.data, {
+      redirectTo: `${origin}/auth/confirm?next=/auth/set-password`,
+    })
   // Same response whether or not the account exists.
   return { message: "If an account exists for that email, a reset link is on its way." }
 }
@@ -171,7 +229,12 @@ export async function setPassword(_prev: FormState, formData: FormData): Promise
   if (!claims?.claims?.sub) return { error: "Your link has expired. Request a new one." }
   const { error } = await supabase.auth.updateUser({ password: parsed.data.password })
   if (error) return { error: error.message }
-  const { data: role } = await supabase.rpc("record_sign_in")
+  const { data: role, error: roleError } = await supabase.rpc("record_sign_in")
+  if (roleError) {
+    console.error("[setPassword] record_sign_in failed", roleError)
+    await supabase.auth.signOut()
+    return { error: "Your password was set, but sign-in could not be completed. Contact your administrator." }
+  }
   const landing = await landingForClient(supabase)
   if (!role && landing !== ACCESS_PAGE) {
     await supabase.auth.signOut()

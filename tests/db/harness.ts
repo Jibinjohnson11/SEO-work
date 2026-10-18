@@ -46,6 +46,9 @@ export const MIGRATIONS_DIR = join(__dirname, "..", "..", "supabase", "migration
 export async function createDb() {
   const db = new PGlite()
   await db.exec(SUPABASE_STUB)
+  // Supabase gives service_role EXECUTE on functions the migration role creates in public through
+  // default privileges (not a blanket grant afterwards), so tests see the real function ACLs.
+  await db.exec("alter default privileges in schema public grant execute on functions to service_role")
   for (const file of readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql")).sort()) {
     try {
       await db.exec(readFileSync(join(MIGRATIONS_DIR, file), "utf8"))
@@ -57,7 +60,6 @@ export async function createDb() {
   await db.exec(`
     grant all on all tables in schema public to service_role;
     grant all on all sequences in schema public to service_role;
-    grant execute on all functions in schema public to service_role;
   `)
   return db
 }

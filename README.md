@@ -22,7 +22,8 @@ Stack: Next.js 16 (App Router, TypeScript), Tailwind CSS 4, shadcn/ui (Base UI),
    - **Allow new users to sign up** and keep **Confirm email** on. This powers the *Create account* page. Self-registered accounts have **no access** until a Super Admin approves them (see §2.1). To stay invitation-only instead, disable sign-ups; the page then shows a "self-registration is turned off" message.
    - Site URL: your app URL, e.g. `https://linkops.your-agency.com`.
    - Redirect URLs: add `https://<your-app>/auth/confirm`.
-4. Update **Authentication → Email Templates** so the *Invite user*, *Reset password* and *Confirm signup* links point to `/auth/confirm`. Copy the templates from `supabase/templates/`. They use `{{ .TokenHash }}`, which the `/auth/confirm` route verifies on the server.
+4. Update **Authentication → Email Templates** so the *Invite user*, *Reset password* and *Confirm signup* links point to `/auth/confirm`. Copy the templates from `supabase/templates/`. They use `{{ .TokenHash }}`. Opening a link shows a short *Continue* page, and the one-time token is verified only when the person presses the button, so corporate mail scanners that open links cannot use them up.
+5. Configure **custom SMTP** (Authentication → SMTP Settings). Supabase's built-in mailer is for development only and is heavily rate-limited, so confirmation, invitation and reset emails will not reliably reach users without it.
 
 The migrations create every table, RLS policy, workflow function, the private `submission-files` storage bucket, and the default configuration (backlink types and settings). They create **no** clients, campaigns or submissions.
 
@@ -33,7 +34,7 @@ Copy `.env.example` to `.env.local` locally, and set the same variables in Verce
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | Anon / publishable key (safe in the browser; RLS protects data) |
-| `SUPABASE_SERVICE_ROLE_KEY` | yes | **Server only.** Used for invitations, disabling users, the scheduled job and the bootstrap script. |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | **Server only.** Used for invitations, disabling users, sign-in rate limiting, the scheduled job and the bootstrap script. |
 | `NEXT_PUBLIC_APP_URL` | yes | Public URL, used in invitation and reset links |
 | `CRON_SECRET` | yes | Protects `/api/cron/daily` |
 | `RESEND_API_KEY`, `EMAIL_FROM` | optional | Email digests and scheduled report emails |
@@ -64,6 +65,9 @@ npm run check          # typecheck + lint + all tests
 1. Import the repository into Vercel and set the environment variables above.
 2. `vercel.json` schedules `GET /api/cron/daily` at 00:30 UTC every day. Vercel sends `Authorization: Bearer $CRON_SECRET` automatically when `CRON_SECRET` is set.
 3. The cron route sets `maxDuration = 300` seconds. On plans with a lower limit, reduce **Settings → Verification → Max checks per run**.
+4. The cron route responds `500` when any step failed (the JSON body lists the errors), so the platform's cron monitoring flags failed runs. Failed report emails are retried on the next runs (up to 3 attempts).
+5. Point an uptime monitor at `GET /api/health` (200 = app configured and Supabase reachable, 503 otherwise).
+6. GitHub Actions (`.github/workflows/ci.yml`) runs typecheck, lint, tests and a build on every pull request and push. It never deploys; the hosting platform builds and deploys from the repository.
 
 ---
 
@@ -85,11 +89,11 @@ Security is enforced in the database, not just by hiding UI:
 - **Other protections:**
   - Server Actions validate input with Zod, then re-check the role server-side (`authorize()`).
   - Server Actions have built-in Origin checks (CSRF).
-  - Login and password-reset requests are rate-limited in the database (`check_rate_limit`).
+  - Sign-in, sign-up, password-reset and resend-confirmation requests are rate-limited in the database (`check_rate_limit`). Only the server (service role) can call the limiter, so clients cannot choose or reset its limits. Enable CAPTCHA in Supabase Auth as well, since Supabase's auth API can be called directly.
   - Redirect targets are restricted to in-app paths.
   - File uploads are limited by MIME type and extension (max 10 MB) and stored in a private bucket with storage RLS. Downloads use 2-minute signed URLs.
   - Text exported to Excel/CSV is escaped against formula injection.
-  - Security headers are set in `next.config.ts`.
+  - Security headers, including a Content-Security-Policy and HSTS, are set in `next.config.ts`.
 - **Self-registration and feature permissions** are covered in §2.1.
 - **The service role key is only used server-side** (`src/lib/supabase/admin.ts`, which imports `server-only`), and only after an explicit Super Admin check, or by the cron route after verifying `CRON_SECRET`.
 
@@ -141,7 +145,7 @@ Checks run from **Backlink Verification** ("Check now" or bulk) and in the daily
 
 ## 6. Tests
 ```bash
-npm test          # 89 tests
+npm test          # all tests
 npm run test:db   # schema, RLS and workflow against real Postgres (PGlite) with Supabase auth/storage stubs
 npm run test:unit # reporting maths, time zones/DST, verification parsing, SSRF guards, workflow rules
 ```

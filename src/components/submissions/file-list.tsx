@@ -1,11 +1,13 @@
 "use client"
 
 import { useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Download, Paperclip, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAction } from "@/hooks/use-action"
 import { getFileUrl, removeSubmissionFile, uploadSubmissionFiles } from "@/server/workflow"
 import { toast } from "sonner"
+import { uploadBatchProblem, uploadSequentially } from "@/lib/upload-batch"
 
 export interface FileItem {
   id: string
@@ -17,6 +19,7 @@ export interface FileItem {
 export function FileList({ submissionId, files, canEdit }: { submissionId: string; files: FileItem[]; canEdit: boolean }) {
   const input = useRef<HTMLInputElement>(null)
   const { pending, execute } = useAction()
+  const router = useRouter()
   return (
     <div className="space-y-2">
       {files.length === 0 ? <p className="text-sm text-muted-foreground">No supporting files.</p> : (
@@ -48,11 +51,28 @@ export function FileList({ submissionId, files, canEdit }: { submissionId: strin
             className="sr-only"
             accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"
             onChange={(e) => {
-              const fd = new FormData()
-              fd.set("submission_id", submissionId)
-              for (const f of Array.from(e.target.files ?? [])) fd.append("files", f)
+              const files = Array.from(e.target.files ?? [])
               e.target.value = ""
-              execute(() => uploadSubmissionFiles(fd))
+              if (!files.length) return
+              const problem = uploadBatchProblem(files)
+              if (problem) {
+                toast.error(problem)
+                return
+              }
+              let uploaded = 0
+              execute(async () => {
+                const r = await uploadSequentially(files, (f) => {
+                  const fd = new FormData()
+                  fd.set("submission_id", submissionId)
+                  fd.append("files", f)
+                  return uploadSubmissionFiles(fd)
+                })
+                uploaded = r.uploaded
+                return r.result
+              }).then((r) => {
+                // A partial upload still changed the list; show the files that did arrive.
+                if (!r.ok && uploaded > 0) router.refresh()
+              })
             }}
           />
           <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => input.current?.click()}><Upload /> {pending ? "Uploading…" : "Upload files"}</Button>

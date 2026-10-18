@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { z } from "zod"
 import { Button } from "@/components/ui/button"
@@ -82,7 +82,7 @@ function InviteForm({
       can_download_reports: true,
     },
   })
-  const selectedRole = form.watch("role")
+  const selectedRole = useWatch({ control: form.control, name: "role" })
   const e = form.formState.errors
   return (
     <form

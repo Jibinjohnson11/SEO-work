@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { isSupabaseConfigured, publicEnv } from "@/lib/env"
 
-const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/setup", "/forgot-password", "/api/cron"]
+const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/setup", "/forgot-password", "/api/cron", "/api/health"]
 
 // Refreshes the Supabase session cookie and sends signed-out visitors to /login.
 // Role checks happen on the server for every page and action, not here.

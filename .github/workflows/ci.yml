@@ -1,0 +1,35 @@
+# Continuous integration: typecheck, lint, unit + database tests, and a production build.
+# This workflow never deploys. Render deploys `main` (render.yaml: autoDeployTrigger checksPass),
+# building from the repository with the environment variables set in the Render dashboard, and only
+# after these checks pass on the merged commit.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Typecheck, lint and all tests (the database suite runs on PGlite; no Supabase needed).
+      - run: npm run check
+      # The build only proves the app compiles. With no Supabase variables, pages redirect to
+      # /setup at runtime, which is expected here.
+      - run: npm run build

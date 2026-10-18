@@ -46,3 +46,13 @@ next-env.d.ts
 /.open-next/
 /.wrangler/
 .dev.vars*
+
+# Supabase CLI local state (version cache, linked-project metadata)
+/supabase/.temp/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/.next-staging/

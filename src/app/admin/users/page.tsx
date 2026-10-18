@@ -11,6 +11,8 @@ import { formatDateTime } from "@/lib/format"
 import { FEATURES, ROLE_LABELS, type AssignableRole } from "@/lib/permissions"
 import { getLookups, getSetting, param, type SearchParams } from "@/server/queries"
 import { rejectUser } from "@/server/admin/access"
+import { accountsWithoutProfile, type AccountWithoutProfile } from "@/server/admin/auth-accounts"
+import { createAdminClient } from "@/lib/supabase/admin"
 import type { Profile, UserStatus } from "@/lib/types"
 import type { Tone } from "@/lib/workflow"
 
@@ -24,12 +26,23 @@ export default async function UsersAccessPage({ searchParams }: { searchParams: 
   const status = param(sp, "status")
   let q = supabase.from("profiles").select("*").order("created_at", { ascending: false })
   if (status) q = q.eq("status", status)
-  const [{ data }, { data: defaultsRows }, lookups, reports] = await Promise.all([
+  const [{ data }, { data: defaultsRows }, lookups, reports, { data: allIds }] = await Promise.all([
     q,
     supabase.from("role_permissions").select("role, features"),
     getLookups(supabase),
     getSetting("reports"),
+    supabase.from("profiles").select("id"),
   ])
+  // Sign-in accounts created outside LinkOps (e.g. invited from the Supabase dashboard) have no
+  // profile, so no role and no access. They are listed so a Super Admin can link them by inviting.
+  let unlinked: AccountWithoutProfile[] = []
+  let unlinkedError = false
+  try {
+    unlinked = await accountsWithoutProfile(createAdminClient(), new Set((allIds ?? []).map((r) => r.id as string)))
+  } catch (error) {
+    console.error("[users] could not list sign-in accounts without a profile", error)
+    unlinkedError = true
+  }
   const users = (data ?? []) as Profile[]
   const roleDefaults: RoleDefaults = { intern: [], client: [] }
   for (const r of (defaultsRows ?? []) as { role: AssignableRole; features: string[] }[]) roleDefaults[r.role] = r.features
@@ -76,6 +89,31 @@ export default async function UsersAccessPage({ searchParams }: { searchParams: 
           </ul>
         </Section>
       ) : null}
+
+      {unlinked.length > 0 ? (
+        <Section
+          title={`Sign-in accounts without a LinkOps profile (${unlinked.length})`}
+          description="Created outside LinkOps, for example invited from the Supabase dashboard. They have no role and cannot open any dashboard. To give one access, invite the same email from Interns (Invite intern), a client's page (Invite client user) or Settings (Invite user): the existing account is linked with the role you choose, never duplicated."
+          bodyClassName="p-0"
+        >
+          <ul className="divide-y">
+            {unlinked.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">{a.email}</div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    created {formatDateTime(a.created_at, reports.timezone)}
+                    {a.invited_at ? ` · invited ${formatDateTime(a.invited_at, reports.timezone)}` : ""}
+                    {a.last_sign_in_at ? ` · last sign-in ${formatDateTime(a.last_sign_in_at, reports.timezone)}` : ""}
+                  </div>
+                </div>
+                <ToneBadge tone={a.confirmed ? "warning" : "info"}>{a.confirmed ? "Confirmed, no profile" : "Invited, not confirmed"}</ToneBadge>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
+      {unlinkedError ? <p className="text-sm text-muted-foreground">Sign-in accounts without a profile could not be listed (check SUPABASE_SERVICE_ROLE_KEY).</p> : null}
 
       <FilterBar
         filters={[
