@@ -1,6 +1,7 @@
 # Continuous integration: typecheck, lint, unit + database tests, and a production build.
-# This workflow never deploys. Deployment is done by the hosting platform (Vercel or Cloudflare),
-# which builds from the repository itself with its own environment variables.
+# This workflow never deploys. Render deploys `main` (render.yaml: autoDeployTrigger checksPass),
+# building from the repository with the environment variables set in the Render dashboard, and only
+# after these checks pass on the merged commit.
 name: CI
 
 on:
