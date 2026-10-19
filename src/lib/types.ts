@@ -199,7 +199,13 @@ export interface SubmissionVersion {
   id: string
   submission_id: string
   version: number
-  snapshot: Record<string, string | null>
+  /** Field values at this version; versions written before 20261019000016 hold material fields only. */
+  snapshot: Record<string, string | number | null>
+  /** NULL for versions written before 20261019000016_submission_versioning.sql. */
+  change_type: "initial" | "material" | "minor" | "unchanged" | null
+  is_material_change: boolean
+  /** Client-approved version this one explicitly relies on (re-approval not required by the campaign). */
+  approval_carried_from: number | null
   change_summary: string | null
   created_by: string | null
   created_at: string

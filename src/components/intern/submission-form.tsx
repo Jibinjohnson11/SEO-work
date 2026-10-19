@@ -142,7 +142,7 @@ export function SubmissionForm({ options, submission, preset }: { options: Inter
           <Field label="Content title" required={req("content_title")} error={e.content_title?.message} htmlFor="content_title"><Input id="content_title" {...form.register("content_title")} /></Field>
           <Field label="Content draft" required={req("content_draft")} error={e.content_draft?.message} htmlFor="content_draft"><Textarea id="content_draft" rows={14} className="font-[inherit] leading-relaxed" {...form.register("content_draft")} /></Field>
           <Field label="Notes for the reviewer" htmlFor="notes"><Textarea id="notes" rows={3} {...form.register("notes")} /></Field>
-          {isRevision ? <Field label="What changed in this revision?" htmlFor="change_summary"><Input id="change_summary" {...form.register("change_summary")} /></Field> : null}
+          {isRevision ? <Field label="What changed in this revision?" hint="Required if you resubmit without changing anything." htmlFor="change_summary"><Input id="change_summary" {...form.register("change_summary")} /></Field> : null}
         </div>
       </Section>
 

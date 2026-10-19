@@ -3,16 +3,8 @@ import { DetailList, Section } from "@/components/shared/page-header"
 import { LiveStatusBadge, SubmissionStatusBadge, ToneBadge } from "@/components/shared/status-badge"
 import { formatDateTime, formatDay } from "@/lib/format"
 import { humanize, SUBMISSION_STATUS } from "@/lib/workflow"
+import { changedFields, VERSION_DISPLAY_FIELDS, versionChange } from "@/lib/versions"
 import type { SubmissionDetail } from "@/server/submission-detail"
-
-const MATERIAL: [string, string][] = [
-  ["proposed_website", "Proposed website"],
-  ["placement_url", "Placement URL"],
-  ["target_url", "Target URL"],
-  ["anchor_text", "Anchor text"],
-  ["content_title", "Content title"],
-  ["content_draft", "Content draft"],
-]
 
 const ext = (url: string | null | undefined) =>
   url ? (
@@ -68,13 +60,15 @@ export function VersionHistory({ d, timeZone }: { d: SubmissionDetail; timeZone:
       <ol className="space-y-3">
         {d.versions.map((v, i) => {
           const prev = d.versions[i + 1]
-          const changed = prev ? MATERIAL.filter(([k]) => (v.snapshot[k] ?? null) !== (prev.snapshot[k] ?? null)).map(([, l]) => l) : []
+          const diff = prev ? changedFields(v, prev) : null
+          const change = versionChange(v, !prev)
           const approvals = d.approvals.filter((a) => a.version === v.version)
           return (
             <li key={v.id} className="rounded-lg border p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">
                   Version {v.version} {v.version === d.submission.current_version ? <ToneBadge tone="info">Current</ToneBadge> : null}
+                  {prev ? <ToneBadge tone={change.tone} className="ml-1">{change.label}</ToneBadge> : null}
                   {approvals.map((a) => (
                     <ToneBadge key={a.id} tone={a.decision === "approved" ? (a.is_admin_override ? "warning" : "success") : "danger"} className="ml-1">
                       {a.is_admin_override ? "Admin override" : `Client ${humanize(a.decision).toLowerCase()}`}
@@ -84,12 +78,24 @@ export function VersionHistory({ d, timeZone }: { d: SubmissionDetail; timeZone:
                 <span className="text-xs text-muted-foreground">{formatDateTime(v.created_at, timeZone)}</span>
               </div>
               {v.change_summary ? <p className="mt-1 text-muted-foreground">{v.change_summary}</p> : null}
-              {prev ? <p className="mt-1 text-xs text-muted-foreground">Changed: {changed.length ? changed.join(", ") : "no material fields"}</p> : <p className="mt-1 text-xs text-muted-foreground">Initial version</p>}
+              {diff ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Changed: {diff.changed.length ? diff.changed.join(", ") : "nothing"}
+                  {diff.notRecorded ? " (some fields were not recorded in the earlier version)" : ""}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">Initial version</p>
+              )}
+              {v.approval_carried_from ? (
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                  Client approval of version {v.approval_carried_from} carried forward: the campaign does not require re-approval after changes.
+                </p>
+              ) : null}
               {i > 0 ? (
                 <details className="mt-2">
                   <summary className="cursor-pointer text-xs text-primary">View this version</summary>
                   <dl className="mt-2 space-y-2 text-xs">
-                    {MATERIAL.map(([k, l]) => (
+                    {VERSION_DISPLAY_FIELDS.filter((f) => f.key in v.snapshot).map(({ key: k, label: l }) => (
                       <div key={k}>
                         <dt className="font-medium text-muted-foreground">{l}</dt>
                         <dd className="whitespace-pre-wrap">{v.snapshot[k] ?? "—"}</dd>
