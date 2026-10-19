@@ -26,9 +26,45 @@
 -- carry-forward record of versions written while this migration was active.
 
 -- 1. Version metadata (additive; existing rows untouched) ----------------------------------------
+-- IF NOT EXISTS: the rollback keeps these columns, so a reapply finds them. The check below then
+-- refuses anything that is not exactly what this migration creates, instead of accepting it silently.
 alter table public.submission_versions
-  add column change_type text check (change_type in ('initial', 'material', 'minor', 'unchanged')),
-  add column approval_carried_from integer check (approval_carried_from > 0);
+  add column if not exists change_type text
+    constraint submission_versions_change_type_check check (change_type in ('initial', 'material', 'minor', 'unchanged')),
+  add column if not exists approval_carried_from integer
+    constraint submission_versions_approval_carried_from_check check (approval_carried_from > 0);
+do $$
+declare
+  e record;
+  c record;
+  n integer;
+begin
+  for e in select * from (values
+      ('change_type', 'text', 'submission_versions_change_type_check',
+       'CHECK ((change_type = ANY (ARRAY[''initial''::text, ''material''::text, ''minor''::text, ''unchanged''::text])))'),
+      ('approval_carried_from', 'integer', 'submission_versions_approval_carried_from_check',
+       'CHECK ((approval_carried_from > 0))')) as x(col, typ, con, def)
+  loop
+    select a.attnum, format_type(a.atttypid, a.atttypmod) as typ, a.attnotnull, a.atthasdef, a.attgenerated into c
+    from pg_catalog.pg_attribute a
+    where a.attrelid = 'public.submission_versions'::regclass and a.attname = e.col and a.attnum > 0 and not a.attisdropped;
+    if c.attnum is null or c.typ <> e.typ or c.attnotnull or c.atthasdef or c.attgenerated <> '' then
+      raise exception 'submission_versions.% exists but is not a nullable % column without a default', e.col, e.typ
+        using errcode = '42P16';
+    end if;
+    -- Exactly one constraint may involve the column, and it must be the expected, validated CHECK.
+    select count(*) into n from pg_catalog.pg_constraint k
+    where k.conrelid = 'public.submission_versions'::regclass and c.attnum = any (k.conkey);
+    if n <> 1 or not exists (
+        select 1 from pg_catalog.pg_constraint k
+        where k.conrelid = 'public.submission_versions'::regclass and k.conname = e.con and k.contype = 'c'
+          and k.convalidated and k.conkey = array[c.attnum] and pg_catalog.pg_get_constraintdef(k.oid) = e.def) then
+      raise exception 'submission_versions.% does not have exactly the expected constraint %', e.col, e.con
+        using errcode = '42P16';
+    end if;
+  end loop;
+end
+$$;
 comment on column public.submission_versions.change_type is
   'initial | material | minor (only non-material fields changed) | unchanged (resubmitted without changes). NULL for versions written before 20261019000016.';
 comment on column public.submission_versions.approval_carried_from is
