@@ -43,14 +43,18 @@ grant select, insert, delete on storage.objects to authenticated;
 
 export const MIGRATIONS_DIR = join(__dirname, "..", "..", "supabase", "migrations")
 
-/** `before`: apply only the migrations whose file name sorts before it (e.g. to compare with a rollback). */
-export async function createDb(before?: string) {
+/**
+ * `before`: apply only the migrations whose file name sorts before it. `skip`: leave out the migration(s)
+ * whose file name starts with it (e.g. "every migration except the ones being rolled back").
+ */
+export async function createDb(before?: string, skip?: string | string[]) {
+  const skipped = typeof skip === "string" ? [skip] : (skip ?? [])
   const db = new PGlite()
   await db.exec(SUPABASE_STUB)
   // Supabase gives service_role EXECUTE on functions the migration role creates in public through
   // default privileges (not a blanket grant afterwards), so tests see the real function ACLs.
   await db.exec("alter default privileges in schema public grant execute on functions to service_role")
-  for (const file of readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql") && (!before || f < before)).sort()) {
+  for (const file of readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(".sql") && (!before || f < before) && !skipped.some((s) => f.startsWith(s))).sort()) {
     try {
       await db.exec(readFileSync(join(MIGRATIONS_DIR, file), "utf8"))
     } catch (error) {

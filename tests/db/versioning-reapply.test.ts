@@ -71,7 +71,8 @@ describe("migration 16: fresh apply, rollback and reapply", () => {
   }
 
   beforeAll(async () => {
-    db = await createDb()
+    // Migration 16's own lifecycle, with nothing newer applied (later migrations are rolled back first).
+    db = await createDb("20261019000017")
     fresh = await catalog(db)
     ids.admin = await createUser(db, "super_admin", "Lifecycle Admin")
     ids.intern = await createUser(db, "intern", "Lifecycle Intern")
@@ -117,7 +118,7 @@ describe("migration 16: fresh apply, rollback and reapply", () => {
 
     // Rollback: the pre-16 catalog except for the two kept columns; data untouched.
     await db.exec(inTransaction(ROLLBACK))
-    const pre16 = await createDb("20261019000016")
+    const pre16 = await createDb("20261019000016") // every migration before 16
     const expectedRolledBack = await catalog(pre16)
     await pre16.close()
     const rolledBack = await catalog(db)

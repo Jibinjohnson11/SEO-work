@@ -403,10 +403,12 @@ describe("rollback (supabase/rollbacks/20261019000016_submission_versioning.roll
     await asSystem(db)
     const counts = "select (select count(*) from submission_versions) || '/' || (select count(*) from internal_reviews) || '/' || (select count(*) from client_approvals) || '/' || (select count(*) from submission_versions where change_type is not null) as n"
     const before = (await one<{ n: string }>(counts)).n
-    const rollback = readFileSync(join(__dirname, "..", "..", "supabase", "rollbacks", "20261019000016_submission_versioning.rollback.sql"), "utf8")
-    await db.exec(`begin;\n${rollback}\ncommit;`)
+    // Rollbacks run newest first: 21 replaces functions that 16's rollback restores.
+    const rollbackFile = (name: string) => readFileSync(join(__dirname, "..", "..", "supabase", "rollbacks", name), "utf8")
+    await db.exec(`begin;\n${rollbackFile("20261023000021_workflow_consistency.rollback.sql")}\ncommit;`)
+    await db.exec(`begin;\n${rollbackFile("20261019000016_submission_versioning.rollback.sql")}\ncommit;`)
 
-    const pre16 = await createDb("20261019000016")
+    const pre16 = await createDb(undefined, ["20261019000016", "20261023000021"]) // every migration except 16 and 21
     const [now, expected] = [await catalog(db), await catalog(pre16)]
     await pre16.close()
     expect(now.triggers).toEqual(expected.triggers)
