@@ -9,6 +9,7 @@ import { InternEditButton, UserMenu } from "@/components/admin/user-actions"
 import { CategoryBarChart, TimeSeriesChart } from "@/components/charts/charts"
 import { addDays, dailySeries, todayIn, weekStart } from "@/lib/reporting"
 import { formatDay, formatDateTime } from "@/lib/format"
+import { teamRoleLabel } from "@/lib/team"
 import { getLookups, getSetting, labelMaps } from "@/server/queries"
 import { internMetrics } from "@/server/intern-metrics"
 import { loadReportData } from "@/server/report-data"
@@ -56,8 +57,8 @@ export default async function InternDetail({ params }: { params: Promise<{ id: s
   return (
     <>
       <PageHeader
-        title={<span className="flex items-center gap-2">{p.full_name || p.email} <ToneBadge tone={p.status === "active" ? "success" : p.status === "invited" ? "info" : "muted"}>{p.status}</ToneBadge></span>}
-        description={`${p.email}${p.job_title ? ` · ${p.job_title}` : ""}`}
+        title={<span className="flex items-center gap-2">{p.full_name || p.email} <ToneBadge tone="neutral">{teamRoleLabel(p.job_title)}</ToneBadge> <ToneBadge tone={p.status === "active" ? "success" : p.status === "invited" ? "info" : "muted"}>{p.status}</ToneBadge></span>}
+        description={p.email}
         actions={<><InternEditButton profile={p} campaignIds={camps.map((c) => c.campaign_id)} campaigns={campaignOptions} /><UserMenu user={p} /></>}
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">

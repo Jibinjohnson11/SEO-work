@@ -215,6 +215,7 @@ const passwordSchema = z
     password: z
       .string()
       .min(10, "Use at least 10 characters")
+      .max(72, "Use at most 72 characters")
       .regex(/[A-Za-z]/, "Include a letter")
       .regex(/\d/, "Include a number"),
     confirm: z.string(),

@@ -27,7 +27,7 @@ export default async function PortalReports() {
             const doc = r.data as ExportDoc
             const sheet = doc.sheets?.[0]
             return (
-              <section key={r.id} className="overflow-hidden rounded-xl border bg-card">
+              <section key={r.id} className="surface overflow-hidden">
                 <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
                   <div><h2 className="text-sm font-semibold">{r.title}</h2><p className="text-xs text-muted-foreground">{formatDay(r.period_start)} – {formatDay(r.period_end)} · shared {formatDateTime(r.published_at, r.timezone)}</p></div>
                   {canDownload(r.client_id) ? (

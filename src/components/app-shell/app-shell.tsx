@@ -132,7 +132,7 @@ function Brand({ name, logoUrl, collapsed, role }: { name: string; logoUrl?: str
         <div className="min-w-0 leading-tight">
           <div className="truncate text-sm font-semibold">{name}</div>
           <div className="text-[11px] text-muted-foreground">
-            {role === "super_admin" ? "Super Admin" : role === "intern" ? "Intern workspace" : role === "client" ? "Client portal" : "Awaiting approval"}
+            {role === "super_admin" ? "Super Admin" : role === "intern" ? "Team workspace" : role === "client" ? "Client portal" : "Awaiting approval"}
           </div>
         </div>
       )}
@@ -176,7 +176,8 @@ function SidebarNav({
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "relative flex h-8 items-center gap-2.5 rounded-md px-2 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
-                  active && "bg-accent font-medium text-accent-foreground hover:bg-accent hover:text-accent-foreground",
+                  active &&
+                    "bg-secondary font-medium text-primary after:absolute after:inset-y-1 after:right-0 after:w-[3px] after:rounded-l after:bg-primary hover:bg-secondary hover:text-primary",
                   collapsed && "justify-center px-0",
                 )}
               >

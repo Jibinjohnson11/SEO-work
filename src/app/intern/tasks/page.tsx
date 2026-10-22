@@ -28,7 +28,7 @@ export default async function InternTasks({ searchParams }: { searchParams: Prom
     <>
       <PageHeader title="My Tasks" description="Assigned by your manager. Targets are per period (day, week or month) unless the task is one-off." />
       <FilterBar filters={[{ type: "select", key: "status", label: "Status", allLabel: "Open", options: [{ value: "all", label: "All" }, ...(Object.keys(TASK_STATUS) as TaskStatus[]).map((s) => ({ value: s, label: TASK_STATUS[s].label }))] }]} />
-      <DataTable
+      <DataTable cards={{ title: "task", badge: "status", actions: "actions" }}
         columns={[
           { key: "task", header: "Task", sortable: true },
           { key: "campaign", header: "Campaign", sortable: true },

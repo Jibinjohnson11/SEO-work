@@ -151,10 +151,10 @@ async function accountsFor(email: string) {
   return data.users.filter((u) => u.email === email).length
 }
 
-/** Opens Invite intern and submits it. The page must already be signed in as the Super Admin. */
+/** Opens Add Team Member and submits it. The page must already be signed in as the Super Admin. */
 async function inviteIntern(page: Page, email: string) {
   await page.goto("/admin/interns")
-  await page.getByRole("button", { name: "Invite intern" }).click()
+  await page.getByRole("button", { name: "Add Team Member" }).click()
   await page.locator("#full_name").fill("E2E Linked Account")
   await page.locator("#email").fill(email)
   await page.getByRole("button", { name: "Send invitation" }).click()

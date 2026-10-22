@@ -21,11 +21,12 @@ export function SubmissionContent({ d, showInternal }: { d: SubmissionDetail; sh
     <Section title="Submission" description={`Version ${s.current_version || "— (draft)"}`}>
       <DetailList
         items={[
-          { label: "Client", value: s.clients.company_name },
+          { label: "Brand", value: s.clients.company_name },
           { label: "Campaign", value: `${s.campaigns.code} · ${s.campaigns.name}` },
           { label: "Keyword", value: s.keywords?.keyword ?? "—" },
           { label: "Backlink type", value: s.backlink_types.name },
           { label: "Task", value: s.tasks ? `${s.tasks.code} · ${s.tasks.title}` : "—" },
+          ...(s.offpage_content_id ? [{ label: "Approved content", value: s.offpage_contents ? `${s.offpage_contents.code} · ${s.offpage_contents.title}` : "Linked Off-Page Content" }] : []),
           { label: "Proposed website", value: ext(s.proposed_website.startsWith("http") ? s.proposed_website : `https://${s.proposed_website}`) },
           { label: "Proposed placement URL", value: ext(s.placement_url) },
           { label: "Target URL", value: ext(s.target_url) },
@@ -223,7 +224,11 @@ export function StageSummary({ d }: { d: SubmissionDetail }) {
       <span className="text-muted-foreground">Stage: {SUBMISSION_STATUS[s.status].stage}</span>
       {d.flags.is_medical ? <ToneBadge tone="warning">Medical review</ToneBadge> : null}
       {!d.flags.require_internal_review ? <ToneBadge tone="muted">No internal review</ToneBadge> : null}
-      {!d.flags.require_client_approval ? <ToneBadge tone="muted">No client approval</ToneBadge> : null}
+      {d.flags.approved_content_id ? (
+        <ToneBadge tone="success">Content approved by client</ToneBadge>
+      ) : !d.flags.require_client_approval ? (
+        <ToneBadge tone="muted">No client approval</ToneBadge>
+      ) : null}
     </div>
   )
 }

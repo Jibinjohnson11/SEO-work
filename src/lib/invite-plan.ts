@@ -29,7 +29,7 @@ export type InvitePlan =
 
 export const INVITE_REFUSALS = {
   profileExists: "A user with this email already exists",
-  superAdmin: "This address belongs to a Super Admin sign-in account. It cannot be invited as an intern or client.",
+  superAdmin: "This address belongs to a Super Admin sign-in account. It cannot be invited as a team member or client.",
   banned: "This sign-in account is banned in Supabase Auth. Lift the ban there before inviting it.",
   concurrent: "This address was just invited by someone else. Refresh the page to see it.",
 } as const

@@ -3,11 +3,8 @@ import {
   BadgeCheck,
   Bell,
   Building2,
-  CalendarClock,
-  CalendarDays,
   CalendarRange,
   ChartColumn,
-  ClipboardCheck,
   FileText,
   Globe,
   History,
@@ -18,7 +15,7 @@ import {
   Send,
   Settings,
   ShieldCheck,
-  Tags,
+  Stethoscope,
   TrendingUp,
   UserCheck,
   Users,
@@ -30,7 +27,7 @@ export interface NavItem {
   href: string
   label: string
   icon: React.ComponentType<{ className?: string }>
-  badgeKey?: "review" | "approvals" | "notifications" | "changes" | "registrations"
+  badgeKey?: "content" | "approvals" | "review" | "notifications" | "changes" | "registrations"
   /** Shown only to users with this feature (Super Admins have every feature). */
   feature?: Feature
 }
@@ -44,20 +41,20 @@ export const NAV: Record<AppRole, NavGroup[]> = {
     {
       label: "Main",
       items: [
-        { href: "/admin", label: "Overview", icon: LayoutDashboard },
-        { href: "/admin/clients", label: "Clients", icon: Building2 },
+        { href: "/admin/clients", label: "Brands", icon: Building2 },
         { href: "/admin/campaigns", label: "Campaigns", icon: Megaphone },
-        { href: "/admin/keywords", label: "Keywords", icon: Tags },
-        { href: "/admin/interns", label: "Interns", icon: Users },
+        { href: "/admin/interns", label: "Team", icon: Users },
         { href: "/admin/tasks", label: "Task Management", icon: ListChecks },
+        { href: "/admin/submissions", label: "Backlink Submissions", icon: Send },
       ],
     },
     {
       label: "Backlink Operations",
       items: [
-        { href: "/admin/submissions", label: "Backlink Submissions", icon: Send },
-        { href: "/admin/review", label: "Internal Review", icon: ClipboardCheck, badgeKey: "review" },
-        { href: "/admin/approvals", label: "Client Approvals", icon: BadgeCheck, badgeKey: "approvals" },
+        { href: "/admin", label: "SEO Dashboard", icon: LayoutDashboard },
+        { href: "/admin/page-content", label: "Off-Page Content", icon: FileText, badgeKey: "content" },
+        { href: "/admin/approvals", label: "Content Approvals", icon: BadgeCheck, badgeKey: "approvals" },
+        { href: "/admin/review", label: "Medical Review", icon: Stethoscope, badgeKey: "review" },
         { href: "/admin/published", label: "Published Backlinks", icon: Globe },
         { href: "/admin/verification", label: "Backlink Verification", icon: Radar },
       ],
@@ -65,11 +62,9 @@ export const NAV: Record<AppRole, NavGroup[]> = {
     {
       label: "Analytics",
       items: [
-        { href: "/admin/reports/daily", label: "Daily Reports", icon: CalendarDays },
-        { href: "/admin/reports/weekly", label: "Weekly Reports", icon: CalendarRange },
-        { href: "/admin/reports/monthly", label: "Monthly Reports", icon: CalendarClock },
+        { href: "/admin/reports", label: "Reports", icon: CalendarRange },
         { href: "/admin/analytics/campaigns", label: "Campaign Analytics", icon: ChartColumn },
-        { href: "/admin/analytics/interns", label: "Intern Performance", icon: TrendingUp },
+        { href: "/admin/analytics/interns", label: "Team Performance", icon: TrendingUp },
       ],
     },
     {
@@ -89,6 +84,7 @@ export const NAV: Record<AppRole, NavGroup[]> = {
         { href: "/intern", label: "My Dashboard", icon: LayoutDashboard, feature: "intern.dashboard" },
         { href: "/intern/tasks", label: "My Tasks", icon: ListChecks, feature: "intern.tasks" },
         { href: "/intern/campaigns", label: "My Campaigns", icon: Megaphone, feature: "intern.campaigns" },
+        { href: "/intern/content", label: "Off-Page Content", icon: FileText, badgeKey: "content", feature: "intern.content" },
         { href: "/intern/submissions", label: "My Submissions", icon: Send, badgeKey: "changes", feature: "intern.submissions" },
         { href: "/intern/performance", label: "My Performance", icon: Activity, feature: "intern.performance" },
         { href: "/intern/notifications", label: "Notifications", icon: Bell, badgeKey: "notifications", feature: "intern.notifications" },
@@ -100,7 +96,7 @@ export const NAV: Record<AppRole, NavGroup[]> = {
       label: "Client Portal",
       items: [
         { href: "/portal", label: "Overview", icon: LayoutDashboard, feature: "portal.overview" },
-        { href: "/portal/approvals", label: "Approvals", icon: ShieldCheck, badgeKey: "approvals", feature: "portal.approvals" },
+        { href: "/portal/approvals", label: "Content Approvals", icon: ShieldCheck, badgeKey: "approvals", feature: "portal.approvals" },
         { href: "/portal/campaigns", label: "Campaigns", icon: Megaphone, feature: "portal.campaigns" },
         { href: "/portal/published", label: "Published Backlinks", icon: Globe, feature: "portal.published" },
         { href: "/portal/reports", label: "Reports", icon: FileText, feature: "portal.reports" },
@@ -129,7 +125,9 @@ const SEGMENT_LABELS: Record<string, string> = {
   intern: "Workspace",
   portal: "Portal",
   reports: "Reports",
+  saved: "Saved report",
   analytics: "Analytics",
+  content: "Content",
   new: "New",
   import: "Import",
   edit: "Edit",

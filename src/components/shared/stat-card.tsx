@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function StatCard({
@@ -8,6 +9,7 @@ export function StatCard({
   href,
   tone = "default",
   icon: Icon,
+  info,
 }: {
   label: string
   value: React.ReactNode
@@ -15,16 +17,25 @@ export function StatCard({
   href?: string
   tone?: "default" | "success" | "warning" | "danger"
   icon?: React.ComponentType<{ className?: string }>
+  /** How the number is calculated; shown as a tooltip on an info icon. */
+  info?: string
 }) {
   const body = (
     <div
       className={cn(
-        "group flex h-full flex-col gap-1 rounded-xl border bg-card p-4 transition-colors",
-        href && "hover:border-primary/40 hover:bg-accent/40",
+        "surface group flex h-full flex-col gap-1 p-4",
+        href && "surface-hover",
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span className="flex min-w-0 items-center gap-1 text-xs font-medium text-muted-foreground">
+          <span className="truncate">{label}</span>
+          {info ? (
+            <span title={info} className="inline-flex shrink-0 cursor-help" tabIndex={0} aria-label={`How ${label} is calculated: ${info}`}>
+              <Info className="size-3.5" aria-hidden />
+            </span>
+          ) : null}
+        </span>
         {Icon ? (
           <Icon
             className={cn(

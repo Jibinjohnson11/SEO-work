@@ -18,7 +18,7 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
     <>
       <PageHeader
         title="Backlink Submissions"
-        description="Every opportunity and content draft submitted by interns, across all stages."
+        description="Every opportunity and content draft submitted by team members, across all stages."
         actions={
           <a href={`/api/submissions/export?${exportQuery}`} className="inline-flex h-7 items-center gap-1 rounded-lg border px-2.5 text-[0.8rem] font-medium hover:bg-muted">
             <Download className="size-3.5" /> Export CSV
@@ -26,7 +26,7 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
         }
       />
       <FilterBar filters={submissionFilters(lookups)} presets={presets} />
-      <DataTable searchPlaceholder="Filter these results…" columns={SUBMISSION_COLUMNS} rows={submissionRows(subs, lookups, reports.timezone)} empty={{ title: "No submissions", description: "Interns' submissions appear here as soon as they are submitted." }} />
+      <DataTable cards={{ title: "code", badge: "status" }} searchPlaceholder="Filter these results…" columns={SUBMISSION_COLUMNS} rows={submissionRows(subs, lookups, reports.timezone)} empty={{ title: "No submissions", description: "Team members' submissions appear here as soon as they are submitted." }} />
       {subs.length >= 2000 ? <p className="text-xs text-muted-foreground">Showing the 2,000 most recently updated. Narrow the filters to see older records.</p> : null}
     </>
   )

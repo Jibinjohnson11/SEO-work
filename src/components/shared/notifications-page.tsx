@@ -15,7 +15,7 @@ export async function NotificationsPage({ role }: { role: AppRole }) {
   return (
     <>
       <PageHeader title="Notifications" description={`${unread} unread · latest 200`} actions={unread ? <MarkAllRead /> : null} />
-      <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="surface overflow-hidden">
         {items.length === 0 ? (
           <EmptyState title="No notifications" description="You'll be notified about assignments, reviews, approvals, publications and verification problems." />
         ) : (

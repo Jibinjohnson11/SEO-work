@@ -13,7 +13,7 @@ export default async function EditSubmission({ params }: { params: Promise<{ id:
   if (!data) notFound()
   const s = data as Submission
   if (!INTERN_EDITABLE.includes(s.status)) redirect(`/intern/submissions/${id}`)
-  const options = await getInternFormOptions(supabase, profile.id)
+  const options = await getInternFormOptions(supabase, profile.id, s.id)
   return (
     <>
       <PageHeader title={`Edit ${s.code}`} description={s.status === "draft" ? "Draft" : "Address the feedback, then resubmit. Your previous version is kept in the history."} />

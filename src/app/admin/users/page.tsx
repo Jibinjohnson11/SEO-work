@@ -7,6 +7,8 @@ import { ToneBadge } from "@/components/shared/status-badge"
 import { ConfirmAction } from "@/components/shared/confirm-action"
 import { ApproveUserButton, ManageAccessButton, RoleDefaultsForm, type RoleDefaults } from "@/components/admin/access-manager"
 import { UserMenu } from "@/components/admin/user-actions"
+import { InviteUserButton } from "@/components/admin/invite-user"
+import { UserPlus } from "lucide-react"
 import { formatDateTime } from "@/lib/format"
 import { FEATURES, ROLE_LABELS, type AssignableRole } from "@/lib/permissions"
 import { getLookups, getSetting, param, type SearchParams } from "@/server/queries"
@@ -26,12 +28,13 @@ export default async function UsersAccessPage({ searchParams }: { searchParams: 
   const status = param(sp, "status")
   let q = supabase.from("profiles").select("*").order("created_at", { ascending: false })
   if (status) q = q.eq("status", status)
-  const [{ data }, { data: defaultsRows }, lookups, reports, { data: allIds }] = await Promise.all([
+  const [{ data }, { data: defaultsRows }, lookups, reports, { data: allIds }, campaignDefaults] = await Promise.all([
     q,
     supabase.from("role_permissions").select("role, features"),
     getLookups(supabase),
     getSetting("reports"),
     supabase.from("profiles").select("id"),
+    getSetting("campaign_defaults"),
   ])
   // Sign-in accounts created outside LinkOps (e.g. invited from the Supabase dashboard) have no
   // profile, so no role and no access. They are listed so a Super Admin can link them by inviting.
@@ -68,7 +71,8 @@ export default async function UsersAccessPage({ searchParams }: { searchParams: 
     <>
       <PageHeader
         title="Users & Access"
-        description="Approve new registrations, assign roles and choose which dashboard features each user can use. Access is checked on the server for every page, action and API call."
+        description="Invite users, approve new registrations, assign roles and choose which dashboard features each user can use. Access is checked on the server for every page, action and API call."
+        actions={<InviteUserButton clients={clients} campaigns={campaigns} defaults={campaignDefaults}><UserPlus /> Invite user</InviteUserButton>}
       />
 
       {pending.length > 0 && status !== "pending" ? (
@@ -93,7 +97,7 @@ export default async function UsersAccessPage({ searchParams }: { searchParams: 
       {unlinked.length > 0 ? (
         <Section
           title={`Sign-in accounts without a LinkOps profile (${unlinked.length})`}
-          description="Created outside LinkOps, for example invited from the Supabase dashboard. They have no role and cannot open any dashboard. To give one access, invite the same email from Interns (Invite intern), a client's page (Invite client user) or Settings (Invite user): the existing account is linked with the role you choose, never duplicated."
+          description="Created outside LinkOps, for example invited from the Supabase dashboard. They have no role and cannot open any dashboard. To give one access, invite the same email with Invite user above, from Team (Add Team Member) or from a brand's page (Invite client user): the existing account is linked with the role you choose, never duplicated."
           bodyClassName="p-0"
         >
           <ul className="divide-y">
@@ -131,7 +135,7 @@ export default async function UsersAccessPage({ searchParams }: { searchParams: 
           },
         ]}
       />
-      <DataTable
+      <DataTable cards={{ title: "name", badge: "status", actions: "actions" }}
         searchPlaceholder="Search users…"
         columns={[
           { key: "name", header: "User", sortable: true },
@@ -177,7 +181,7 @@ export default async function UsersAccessPage({ searchParams }: { searchParams: 
               ),
           },
         }))}
-        empty={{ title: "No users", description: status ? "No users with this status." : "Invite users from Settings → Users, or share the sign-up page." }}
+        empty={{ title: "No users", description: status ? "No users with this status." : "Invite users with Invite user above, or share the sign-up page." }}
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -185,7 +189,7 @@ export default async function UsersAccessPage({ searchParams }: { searchParams: 
           <Section
             key={role}
             title={`${ROLE_LABELS[role]} role defaults`}
-            description={`Features for ${role === "intern" ? "interns" : "client users"} set to “Follow role defaults”. Users with custom access are not affected.`}
+            description={`Features for ${role === "intern" ? "team members" : "client users"} set to “Follow role defaults”. Users with custom access are not affected.`}
           >
             <RoleDefaultsForm role={role} initial={roleDefaults[role]} />
           </Section>
@@ -194,7 +198,7 @@ export default async function UsersAccessPage({ searchParams }: { searchParams: 
       <p className="text-xs text-muted-foreground">
         Workspace-level client permissions (approve content, download reports) are still managed per workspace under{" "}
         <Link href="/admin/clients" className="text-primary hover:underline">
-          Clients
+          Brands
         </Link>
         ; a client user needs both the feature and the workspace permission.
       </p>

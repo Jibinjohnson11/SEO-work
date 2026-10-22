@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
+import { TeamRoleField } from "@/components/admin/team-role-field"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { z } from "zod"
 import { MoreHorizontal } from "lucide-react"
@@ -48,7 +49,7 @@ export function InternEditButton(props: { profile: Profile; campaignIds: string[
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>Edit</Button>
-      <FormDialog open={open} onOpenChange={setOpen} title="Edit intern">
+      <FormDialog open={open} onOpenChange={setOpen} title="Edit team member">
         {open ? <InternEditForm {...props} onDone={() => setOpen(false)} /> : null}
       </FormDialog>
     </>
@@ -75,7 +76,7 @@ function InternEditForm({ profile, campaignIds, campaigns, onDone }: { profile: 
     <form noValidate className="space-y-4" onSubmit={form.handleSubmit(async (v) => { const r = await execute(() => updateIntern(profile.id, v)); if (r.ok) onDone() })}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Full name" required error={e.full_name?.message} htmlFor="full_name"><Input id="full_name" {...form.register("full_name")} /></Field>
-        <Field label="Role / title" htmlFor="job_title"><Input id="job_title" {...form.register("job_title")} /></Field>
+        <Controller control={form.control} name="job_title" render={({ field }) => <TeamRoleField value={field.value ?? ""} onChange={field.onChange} error={e.job_title?.message} />} />
         <Field label="Joining date" htmlFor="joining_date"><Input id="joining_date" type="date" {...form.register("joining_date")} /></Field>
         <Field label="Status" htmlFor="status">
           <NativeSelect id="status" {...form.register("status")}><option value="active">Active</option><option value="invited">Invited</option><option value="disabled">Disabled</option></NativeSelect>

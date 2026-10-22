@@ -2,22 +2,74 @@
 
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
-import { authorize } from "@/lib/auth"
+import { ActionError, authorize } from "@/lib/auth"
 import { must, run } from "@/lib/actions"
+import { todayIn } from "@/lib/reporting"
+import { splitTarget, taskTitle } from "@/lib/task-plan"
 import { blankToNull, taskSchema, taskUpdateSchema, type TaskInput, type TaskUpdateInput } from "@/lib/validation"
+import { getSetting } from "@/server/queries"
+import { assignableMembers } from "@/server/task-members"
 
 const id = z.string().uuid()
 
-/** Creates one task per (intern × campaign) pair — bulk assignment across campaigns and interns. */
+/**
+ * Creates one task per selected team member for a brand → campaign → keyword. Title, start date
+ * (today in the reporting time zone) and priority (the table default) are set automatically.
+ */
 export async function createTasks(input: TaskInput) {
   return run(async () => {
-    const { intern_ids, campaign_ids, ...fields } = taskSchema.parse(input)
-    if (intern_ids.length * campaign_ids.length > 500) throw new Error("That would create more than 500 tasks at once")
+    const v = taskSchema.parse(input)
     const { supabase, userId } = await authorize(["super_admin"])
-    const base = blankToNull(fields)
-    const rows = intern_ids.flatMap((intern_id) =>
-      campaign_ids.map((campaign_id) => ({ ...base, intern_id, campaign_id, created_by: userId })),
-    )
+    const [campaign, link, type, members, { timezone }] = await Promise.all([
+      supabase.from("campaigns").select("id, status").eq("id", v.campaign_id).eq("client_id", v.client_id).maybeSingle(),
+      supabase.from("campaign_keywords").select("keywords(keyword)").eq("campaign_id", v.campaign_id).eq("keyword_id", v.keyword_id).maybeSingle(),
+      v.backlink_type_id ? supabase.from("backlink_types").select("name").eq("id", v.backlink_type_id).maybeSingle() : Promise.resolve({ data: null }),
+      assignableMembers(supabase),
+      getSetting("reports"),
+    ])
+    if (!campaign.data) throw new ActionError("That campaign does not belong to the selected brand")
+    if (campaign.data.status !== "active") throw new ActionError("Work can only be assigned for active campaigns. Activate the campaign first.")
+    const keyword = (link.data?.keywords as unknown as { keyword: string } | null)?.keyword
+    if (!keyword) throw new ActionError("That keyword is not part of the selected campaign")
+    const names = new Map(members.map((m) => [m.id, m.label]))
+    const internIds = [...new Set(v.intern_ids)]
+    if (internIds.some((i) => !names.has(i))) throw new ActionError("One of the selected team members can no longer receive tasks")
+
+    const today = todayIn(timezone)
+    if (v.due_date && v.due_date < today) throw new ActionError("The deadline cannot be in the past")
+
+    // Duplicate guard: the same open work (member, campaign, keyword, type, frequency) is never assigned twice.
+    let dup = supabase
+      .from("tasks")
+      .select("intern_id")
+      .eq("campaign_id", v.campaign_id)
+      .eq("keyword_id", v.keyword_id)
+      .eq("cadence", v.cadence)
+      .in("intern_id", internIds)
+      .not("status", "in", "(completed,cancelled)")
+    dup = v.backlink_type_id ? dup.eq("backlink_type_id", v.backlink_type_id) : dup.is("backlink_type_id", null)
+    const existing = must(await dup) as { intern_id: string }[]
+    if (existing.length) {
+      const who = [...new Set(existing.map((t) => names.get(t.intern_id) ?? "a team member"))].join(", ")
+      throw new ActionError(`Already assigned (open task with the same keyword, type and frequency): ${who}`)
+    }
+
+    const shared = v.target_mode === "shared" && internIds.length > 1
+    const quantities = splitTarget(v.target_quantity, internIds.length, shared ? "shared" : "each")
+    const title = taskTitle(keyword, type.data?.name ?? null, shared ? v.target_quantity : undefined)
+    const rows = internIds.map((intern_id, i) => ({
+      title,
+      intern_id,
+      campaign_id: v.campaign_id,
+      keyword_id: v.keyword_id,
+      backlink_type_id: v.backlink_type_id || null,
+      cadence: v.cadence,
+      target_quantity: quantities[i],
+      start_date: today,
+      due_date: v.due_date || null,
+      instructions: v.instructions || null,
+      created_by: userId,
+    }))
     must(await supabase.from("tasks").insert(rows))
     revalidatePath("/admin/tasks")
     return rows.length
@@ -54,13 +106,11 @@ export async function bulkTaskAction(
 export async function deleteTask(taskId: string) {
   return run(async () => {
     const { supabase } = await authorize(["super_admin"])
-    const { count } = await supabase.from("backlink_submissions").select("id", { count: "exact", head: true }).eq("task_id", taskId)
-    if (count) {
-      must(await supabase.from("tasks").update({ status: "cancelled" }).eq("id", id.parse(taskId)))
-      return "cancelled"
-    }
-    must(await supabase.from("tasks").delete().eq("id", id.parse(taskId)))
+    const tid = id.parse(taskId)
+    const { count } = await supabase.from("backlink_submissions").select("id", { count: "exact", head: true }).eq("task_id", tid)
+    if (count) must(await supabase.from("tasks").update({ status: "cancelled" }).eq("id", tid))
+    else must(await supabase.from("tasks").delete().eq("id", tid))
     revalidatePath("/admin/tasks")
-    return "deleted"
+    return count ? "cancelled" : "deleted"
   })
 }

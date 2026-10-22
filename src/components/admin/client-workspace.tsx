@@ -51,7 +51,7 @@ export function MemberControls({ memberId, canApprove, canDownload, name }: { me
         <Switch checked={canDownload} disabled={pending} onCheckedChange={(c) => execute(() => setMemberPermissions(memberId, { can_approve: canApprove, can_download_reports: Boolean(c) }))} />
         Download
       </label>
-      <ConfirmAction title={`Remove ${name} from this workspace?`} description="They will lose access to this client's portal. Their past decisions stay in the history." destructive confirmLabel="Remove" onConfirm={() => removeMember(memberId)} variant="ghost">
+      <ConfirmAction title={`Remove ${name} from this workspace?`} description="They will lose access to this brand's portal. Their past decisions stay in the history." destructive confirmLabel="Remove" onConfirm={() => removeMember(memberId)} variant="ghost">
         Remove
       </ConfirmAction>
     </div>

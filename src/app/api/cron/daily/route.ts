@@ -3,13 +3,13 @@ import { NextResponse, type NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { MissingConfigError, serverEnv } from "@/lib/server-env"
 import { runVerificationBatch, DEFAULT_VERIFICATION_SETTINGS } from "@/lib/verification/run"
-import { buildReport, pivot, presetRange, weekStart, todayIn, type ReportEvent, type TaskTarget, type SubmissionSnapshot } from "@/lib/reporting"
+import { scheduledReportAnchor, todayIn } from "@/lib/reporting"
 import { renderExport, type ExportDoc, type ExportFormat } from "@/lib/export"
 import { isEmailConfigured, sendEmail } from "@/lib/email"
 import { digestEmail, reportEmail } from "@/lib/email-content"
 import { publicEnv } from "@/lib/env"
-import { reportToExport } from "@/server/report-data"
 import { SETTINGS_DEFAULTS } from "@/server/queries"
+import { REPORT_PERIODS, unifiedReport, unifiedToExport } from "@/server/unified-report"
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -139,7 +139,7 @@ function authorized(request: NextRequest) {
 }
 
 /**
- * Scheduled job (Vercel Cron, see vercel.json). Runs with the service role:
+ * Scheduled job (Render cron job `linkops-daily`, see render.yaml). Runs with the service role:
  * 1) deadline reminders, 2) due backlink verification, 3) scheduled report snapshot + email,
  * 4) email delivery of pending notifications (when email is configured), 5) rate-limit cleanup.
  * Responds 500 when any step failed, so the platform's cron monitoring flags the run.
@@ -177,59 +177,30 @@ export async function GET(request: NextRequest) {
   } else summary.verification = "disabled"
 
   // Scheduled report: daily → yesterday, weekly → last week (on Mondays), monthly → last month (on the 1st).
+  // Built by the same code as the Reports page (unifiedReport), so a scheduled snapshot has the same
+  // columns and counts as a snapshot saved there, and reads every row (paged past the API row limit).
   const tz = reports.timezone
-  const today = todayIn(tz)
-  const runReport =
-    reports.schedule === "daily" ||
-    (reports.schedule === "weekly" && weekStart(today) === today) ||
-    (reports.schedule === "monthly" && today.endsWith("-01"))
-  if (runReport) {
-    const preset = reports.schedule === "daily" ? "yesterday" : reports.schedule === "weekly" ? "last_week" : "last_month"
-    const period = presetRange(preset, tz)
-    const { data: existing } = await supabase
-      .from("reports")
-      .select("id")
-      .eq("is_scheduled", true)
-      .eq("kind", reports.schedule)
-      .eq("period_start", period.from)
-      .is("client_id", null)
-      .maybeSingle()
-    if (existing) summary.report = "already generated"
-    else {
-      const range = { start: `${period.from}T00:00:00Z`, end: `${period.to}T23:59:59Z` }
-      // Pad by a day each side; buildReport trims to calendar dates in the report time zone.
-      const pad = (d: string, days: number) => new Date(new Date(d).getTime() + days * 86400_000).toISOString()
-      const [ev, tk, sb, cl, cp, it, ty, kw] = await Promise.all([
-        supabase.from("report_events").select("submission_id, metric, occurred_at, client_id, campaign_id, keyword_id, intern_id, backlink_type_id").gte("occurred_at", pad(range.start, -1)).lte("occurred_at", pad(range.end, 1)).limit(50000),
-        supabase.from("tasks").select("id, intern_id, campaign_id, client_id, keyword_id, backlink_type_id, cadence, target_quantity, start_date, due_date, status").lte("start_date", period.to).neq("status", "cancelled").limit(50000),
-        supabase.from("backlink_submissions").select("id, status, first_submitted_at, client_id, campaign_id, keyword_id, intern_id, backlink_type_id").gte("first_submitted_at", pad(range.start, -1)).lte("first_submitted_at", pad(range.end, 1)).limit(50000),
-        supabase.from("clients").select("id, company_name"),
-        supabase.from("campaigns").select("id, code, status"),
-        supabase.from("profiles").select("id, full_name").eq("role", "intern"),
-        supabase.from("backlink_types").select("id, name"),
-        supabase.from("keywords").select("id, keyword"),
-      ])
-      // A partial read would save a report full of wrong zeros; skip it and retry on the next run.
-      const readError = [ev, tk, sb, cl, cp, it, ty, kw].find((r) => r.error)?.error
-      if (readError) {
-        errors.push(`scheduled report data: ${readError.message}`)
-        summary.report = "error"
-      } else {
-        const labels = {
-          client: Object.fromEntries((cl.data ?? []).map((c) => [c.id, c.company_name])),
-          campaign: Object.fromEntries((cp.data ?? []).map((c) => [c.id, c.code])),
-          intern: Object.fromEntries((it.data ?? []).map((c) => [c.id, c.full_name])),
-          backlink_type: Object.fromEntries((ty.data ?? []).map((c) => [c.id, c.name])),
-          keyword: Object.fromEntries((kw.data ?? []).map((c) => [c.id, c.keyword])),
-        }
-        const events = (ev.data ?? []) as ReportEvent[]
-        const report = buildReport({ events, tasks: (tk.data ?? []) as TaskTarget[], submissions: (sb.data ?? []) as SubmissionSnapshot[], from: period.from, to: period.to, timeZone: tz, groupBy: ["campaign"], labels })
-        const matrix = pivot({ events, metric: "submitted", rowDim: "campaign", colDim: "backlink_type", from: period.from, to: period.to, timeZone: tz, labels, includeRows: (cp.data ?? []).filter((c) => c.status === "active").map((c) => c.id) })
-        const doc = reportToExport({ report, matrix, groupBy: "campaign", period: { preset, ...period }, timeZone: tz }, `Scheduled ${reports.schedule} backlink report`)
+  const anchor = scheduledReportAnchor(reports.schedule, todayIn(tz))
+  if (anchor) {
+    const schedule = reports.schedule as "daily" | "weekly" | "monthly"
+    try {
+      const ctx = await unifiedReport(supabase, { period: schedule, date: anchor }, tz)
+      const { data: existing } = await supabase
+        .from("reports")
+        .select("id")
+        .eq("is_scheduled", true)
+        .eq("kind", schedule)
+        .eq("period_start", ctx.range.from)
+        .is("client_id", null)
+        .maybeSingle()
+      if (existing) summary.report = "already generated"
+      else {
+        const doc = unifiedToExport(ctx, `Scheduled ${REPORT_PERIODS[schedule].toLowerCase()} backlink report`)
         const ins = await supabase
           .from("reports")
           .insert({
-            kind: reports.schedule, title: doc.title, period_start: period.from, period_end: period.to, timezone: tz, data: doc, is_scheduled: true,
+            kind: schedule, title: doc.title, period_start: ctx.range.from, period_end: ctx.range.to, timezone: tz, data: doc, is_scheduled: true,
+            filters: { period: schedule, date: anchor },
             email_status: reports.recipients.length ? "pending" : "skipped",
           })
           .select("id")
@@ -237,6 +208,10 @@ export async function GET(request: NextRequest) {
         if (ins.error) errors.push(`scheduled report: ${ins.error.message}`)
         summary.report = ins.error ? "error" : ins.data.id
       }
+    } catch (e) {
+      // A partial read would save a report full of wrong zeros; skip it and retry on the next run.
+      errors.push(`scheduled report data: ${(e as { message?: string }).message ?? String(e)}`)
+      summary.report = "error"
     }
   }
   summary.report_email = await deliverPendingReports(supabase, reports, errors)

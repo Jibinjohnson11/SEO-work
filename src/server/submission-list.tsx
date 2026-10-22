@@ -45,9 +45,9 @@ export function submissionFilters(lookups: Lookups, opts: { statuses?: Submissio
     { type: "search", key: "q", label: "Search", placeholder: "Code, website, title, anchor…" },
     ...(opts.withPeriod === false ? [] : [{ type: "period" as const, label: "Submitted", presets: [{ value: "", label: "Any time" }, ...["today", "yesterday", "last_7", "this_week", "this_month", "last_month", "last_30", "custom"].map((v) => ({ value: v, label: { today: "Today", yesterday: "Yesterday", last_7: "Last 7 days", this_week: "This week", this_month: "This month", last_month: "Last month", last_30: "Last 30 days", custom: "Custom range" }[v]! }))] }]),
     { type: "select", key: "status", label: "Status", allLabel: opts.statuses ? "All in queue" : "All except archived", options: (opts.statuses ?? [...SUBMISSION_STATUSES, "all" as SubmissionStatus]).map((s) => ({ value: s, label: s === ("all" as string) ? "Including archived" : SUBMISSION_STATUS[s].label })) },
-    { type: "select", key: "client", label: "Client", options: lookups.clients.map((c) => ({ value: c.id, label: c.company_name })) },
+    { type: "select", key: "client", label: "Brand", options: lookups.clients.map((c) => ({ value: c.id, label: c.company_name })) },
     { type: "select", key: "campaign", label: "Campaign", options: lookups.campaigns.map((c) => ({ value: c.id, label: `${c.code} · ${c.name}` })) },
-    { type: "select", key: "intern", label: "Intern", options: lookups.interns.map((i) => ({ value: i.id, label: i.full_name || i.email })) },
+    { type: "select", key: "intern", label: "Team member", options: lookups.interns.map((i) => ({ value: i.id, label: i.full_name || i.email })) },
     { type: "select", key: "type", label: "Backlink type", options: lookups.types.map((t) => ({ value: t.id, label: t.name })) },
   ]
 }
@@ -56,7 +56,7 @@ export const SUBMISSION_COLUMNS: DataColumn[] = [
   { key: "code", header: "Submission", sortable: true },
   { key: "campaign", header: "Campaign", sortable: true },
   { key: "type", header: "Type", sortable: true },
-  { key: "intern", header: "Intern", sortable: true },
+  { key: "intern", header: "Team member", sortable: true },
   { key: "version", header: "Ver.", sortable: true, align: "right" },
   { key: "submitted", header: "Submitted", sortable: true },
   { key: "updated", header: "Last update", sortable: true },
@@ -67,6 +67,7 @@ export function submissionRows(subs: Submission[], lookups: Lookups, timeZone: s
   const labels = labelMaps(lookups)
   return subs.map((s) => ({
     id: s.id,
+    href: `${hrefBase}/${s.id}`,
     search: `${s.code} ${s.proposed_website} ${s.content_title ?? ""} ${s.anchor_text ?? ""} ${labels.campaign[s.campaign_id] ?? ""} ${labels.intern[s.intern_id] ?? ""}`,
     sort: { code: s.code, campaign: labels.campaign[s.campaign_id], type: labels.backlink_type[s.backlink_type_id], intern: labels.intern[s.intern_id], version: s.current_version, submitted: s.first_submitted_at, updated: s.updated_at, status: s.status },
     cells: {

@@ -55,9 +55,9 @@ function ReassignButton({ id, interns }: { id: string; interns: { id: string; la
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}><UserRoundCog /> Reassign</Button>
-      <FormDialog open={open} onOpenChange={setOpen} title="Reassign submission" description="The new intern is assigned to the campaign if needed and asked to revise the work.">
+      <FormDialog open={open} onOpenChange={setOpen} title="Reassign submission" description="The new team member is assigned to the campaign if needed and asked to revise the work.">
         <div className="space-y-4">
-          <Field label="Intern" required htmlFor="ra-intern">
+          <Field label="Team member" required htmlFor="ra-intern">
             <NativeSelect id="ra-intern" value={intern} onChange={(e) => setIntern(e.target.value)}>
               <option value="">Choose…</option>
               {interns.map((i) => <option key={i.id} value={i.id}>{i.label}</option>)}

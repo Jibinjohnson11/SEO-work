@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -48,7 +50,7 @@ function ChartFrame({
 }) {
   const [asTable, setAsTable] = useState(false)
   return (
-    <section className="rounded-xl border bg-card">
+    <section className="surface">
       <header className="flex items-start justify-between gap-2 border-b px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold">{title}</h2>
@@ -252,6 +254,130 @@ export function CategoryBarChart({
               </Bar>
             ))}
           </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </ChartFrame>
+  )
+}
+
+/**
+ * Stacked columns per date (e.g. backlinks per team member). Clicking a legend entry hides or shows
+ * that series; a 2px surface gap separates stacked segments. Series beyond the palette must be folded
+ * into a neutral "reference" series by the caller (colors are never cycled).
+ */
+export function StackedDailyChart({
+  title,
+  description,
+  data,
+  series,
+}: {
+  title: string
+  description?: string
+  data: ({ date: string } & Record<string, number | string>)[]
+  series: Series[]
+}) {
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
+  const empty = data.every((d) => series.every((s) => !Number(d[s.key])))
+  const shortDay = (d: string) => formatDay(d, "d MMM")
+  const visible = series.filter((s) => !hidden.has(s.key))
+  const top = visible.at(-1)?.key
+  return (
+    <ChartFrame
+      title={title}
+      description={description}
+      empty={empty}
+      table={<DataTableView rows={data.map((d) => ({ ...d, date: formatDay(d.date) }))} categoryKey="date" categoryLabel="Date" series={series} />}
+    >
+      <div className="h-80">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }} barCategoryGap="20%">
+            <CartesianGrid vertical={false} stroke="var(--border)" />
+            <XAxis dataKey="date" tickFormatter={shortDay} {...AXIS} minTickGap={16} />
+            <YAxis allowDecimals={false} {...AXIS} />
+            <Tooltip content={<TooltipBox formatLabel={(l) => formatDay(l)} />} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
+            <Legend
+              iconType="circle"
+              iconSize={8}
+              wrapperStyle={{ cursor: "pointer" }}
+              formatter={(value: string, entry: { dataKey?: unknown }) => (
+                <span className={`text-xs ${hidden.has(String(entry.dataKey)) ? "text-muted-foreground/50 line-through" : "text-muted-foreground"}`}>{value}</span>
+              )}
+              onClick={(e: { dataKey?: unknown }) =>
+                setHidden((prev) => {
+                  const next = new Set(prev)
+                  const k = String(e.dataKey)
+                  if (next.has(k)) next.delete(k)
+                  else next.add(k)
+                  return next
+                })
+              }
+            />
+            {series.map((s) => (
+              <Bar
+                key={s.key}
+                dataKey={s.key}
+                name={s.label}
+                stackId="stack"
+                hide={hidden.has(s.key)}
+                fill={color(s)}
+                fillOpacity={s.slot === "reference" ? 0.5 : 1}
+                stroke="var(--card)"
+                strokeWidth={1}
+                radius={s.key === top ? [4, 4, 0, 0] : 0}
+                maxBarSize={36}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </ChartFrame>
+  )
+}
+
+/** Running totals over time as overlapping areas (e.g. published vs. verified live; not stacked). */
+export function CumulativeChart({
+  title,
+  description,
+  data,
+  series,
+}: {
+  title: string
+  description?: string
+  data: ({ date: string } & Record<string, number | string>)[]
+  series: Series[]
+}) {
+  const empty = data.every((d) => series.every((s) => !Number(d[s.key])))
+  const shortDay = (d: string) => formatDay(d, "d MMM")
+  return (
+    <ChartFrame
+      title={title}
+      description={description}
+      empty={empty}
+      table={<DataTableView rows={data.map((d) => ({ ...d, date: formatDay(d.date) }))} categoryKey="date" categoryLabel="Date" series={series} />}
+    >
+      <div className="h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+            <CartesianGrid vertical={false} stroke="var(--border)" />
+            <XAxis dataKey="date" tickFormatter={shortDay} {...AXIS} minTickGap={24} />
+            <YAxis allowDecimals={false} {...AXIS} />
+            <Tooltip content={<TooltipBox formatLabel={(l) => formatDay(l)} />} cursor={{ stroke: "var(--muted-foreground)", strokeDasharray: "3 3" }} />
+            <Legend iconType="circle" iconSize={8} formatter={legendFormatter} />
+            {series.map((s) => (
+              <Area
+                key={s.key}
+                type="monotone"
+                dataKey={s.key}
+                name={s.label}
+                stroke={color(s)}
+                strokeWidth={2}
+                fill={color(s)}
+                fillOpacity={0.12}
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--card)" }}
+              />
+            ))}
+          </AreaChart>
         </ResponsiveContainer>
       </div>
     </ChartFrame>

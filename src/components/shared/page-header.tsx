@@ -38,7 +38,7 @@ export function Section({
   bodyClassName?: string
 }) {
   return (
-    <section className={cn("rounded-xl border bg-card text-card-foreground", className)}>
+    <section className={cn("surface", className)}>
       {title || actions ? (
         <header className="flex flex-wrap items-start justify-between gap-2 border-b px-4 py-3">
           <div className="space-y-0.5">

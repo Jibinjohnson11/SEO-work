@@ -136,7 +136,7 @@ test.describe.serial("invitation → accept → set password → dashboard @writ
     const since = Date.now()
     await signIn(page, adminUser.email)
     await page.goto("/admin/interns")
-    await page.getByRole("button", { name: "Invite intern" }).click()
+    await page.getByRole("button", { name: "Add Team Member" }).click()
     await page.locator("#full_name").fill("E2E Invited Intern")
     await page.locator("#email").fill(testEmail("invited-ui"))
     await page.getByRole("button", { name: "Send invitation" }).click()

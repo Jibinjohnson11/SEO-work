@@ -1,5 +1,5 @@
-import Link from "next/link"
 import { requireRole } from "@/lib/auth"
+import { CardGrid, EntityCard } from "@/components/shared/card-grid"
 import { PageHeader } from "@/components/shared/page-header"
 import { EmptyState } from "@/components/shared/empty-state"
 import { CampaignStatusBadge, PriorityBadge } from "@/components/shared/status-badge"
@@ -19,19 +19,28 @@ export default async function InternCampaigns() {
     <>
       <PageHeader title="My Campaigns" description="Only campaigns you are assigned to are shown." />
       {campaigns.length === 0 ? <EmptyState title="No campaigns assigned yet" /> : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <CardGrid>
           {campaigns.map((c) => {
-            const keywords = kw.filter((k) => k.campaign_id === c.id)
+            const keywords = kw.filter((k) => k.campaign_id === c.id).sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
             return (
-              <Link key={c.id} href={`/intern/campaigns/${c.id}`} className="space-y-2 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40">
-                <div className="flex items-center justify-between gap-2"><span className="font-semibold">{c.code}</span><span className="flex gap-1"><PriorityBadge priority={c.priority} /><CampaignStatusBadge status={c.status} /></span></div>
-                <div className="text-sm">{c.name}</div>
-                <div className="text-xs text-muted-foreground">{c.clients.company_name}</div>
-                <div className="truncate text-xs text-muted-foreground">{keywords.sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).map((k) => k.keywords.keyword).join(" · ") || "No keywords"}</div>
-              </Link>
+              <li key={c.id} className="min-w-0">
+                <EntityCard
+                  title={<span className="block font-semibold">{c.name}</span>}
+                  tooltip={c.name}
+                  badge={<CampaignStatusBadge status={c.status} />}
+                  href={`/intern/campaigns/${c.id}`}
+                  footerNote={<PriorityBadge priority={c.priority} />}
+                  details={[
+                    { label: "Brand", value: c.clients.company_name },
+                    { label: "Code", value: c.code },
+                    { label: "Primary keyword", value: keywords.find((k) => k.is_primary)?.keywords.keyword ?? "—" },
+                    { label: "All keywords", value: <span className="line-clamp-2" title={keywords.map((k) => k.keywords.keyword).join(" · ")}>{keywords.map((k) => k.keywords.keyword).join(" · ") || "No keywords"}</span> },
+                  ]}
+                />
+              </li>
             )
           })}
-        </div>
+        </CardGrid>
       )}
     </>
   )

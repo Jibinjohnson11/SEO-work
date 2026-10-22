@@ -31,13 +31,13 @@ export default async function PublishedPage({ searchParams }: { searchParams: Pr
         filters={[
           { type: "search", key: "q", label: "Search", placeholder: "URL, domain, anchor, SUB code" },
           { type: "select", key: "live", label: "Live status", options: (Object.keys(LIVE_STATUS) as LiveStatus[]).map((s) => ({ value: s, label: LIVE_STATUS[s].label })) },
-          { type: "select", key: "client", label: "Client", options: lookups.clients.map((c) => ({ value: c.id, label: c.company_name })) },
+          { type: "select", key: "client", label: "Brand", options: lookups.clients.map((c) => ({ value: c.id, label: c.company_name })) },
           { type: "select", key: "campaign", label: "Campaign", options: lookups.campaigns.map((c) => ({ value: c.id, label: `${c.code} · ${c.name}` })) },
-          { type: "select", key: "intern", label: "Intern", options: lookups.interns.map((i) => ({ value: i.id, label: i.full_name || i.email })) },
+          { type: "select", key: "intern", label: "Team member", options: lookups.interns.map((i) => ({ value: i.id, label: i.full_name || i.email })) },
           { type: "select", key: "type", label: "Backlink type", options: lookups.types.map((t) => ({ value: t.id, label: t.name })) },
         ]}
       />
-      <DataTable
+      <DataTable cards={{ title: "url", badge: "status" }}
         searchPlaceholder={false}
         bulk={<VerifyBulk />}
         columns={[
@@ -45,7 +45,7 @@ export default async function PublishedPage({ searchParams }: { searchParams: Pr
           { key: "submission", header: "Submission", sortable: true },
           { key: "campaign", header: "Campaign", sortable: true },
           { key: "type", header: "Type", sortable: true },
-          { key: "intern", header: "Intern", sortable: true },
+          { key: "intern", header: "Team member", sortable: true },
           { key: "anchor", header: "Anchor / attribute" },
           { key: "date", header: "Published", sortable: true },
           { key: "checked", header: "Last checked", sortable: true },
@@ -53,6 +53,7 @@ export default async function PublishedPage({ searchParams }: { searchParams: Pr
         ]}
         rows={rows.map((p) => ({
           id: p.id,
+          href: `/admin/submissions/${p.submission_id}`,
           sort: { url: p.publisher_domain, submission: p.backlink_submissions.code, campaign: l.campaign[p.campaign_id], type: l.backlink_type[p.backlink_type_id], intern: l.intern[p.intern_id], date: p.publication_date, checked: p.last_checked_at, status: p.live_status },
           cells: {
             url: <a href={p.published_url} target="_blank" rel="noreferrer noopener nofollow" className="block max-w-72 truncate text-primary hover:underline">{p.published_url}</a>,

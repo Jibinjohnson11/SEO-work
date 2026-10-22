@@ -1,5 +1,7 @@
 import { z } from "zod"
 import { isHttpUrl } from "@/lib/url"
+import { CONTENT_TYPES, type ContentType } from "@/lib/offpage-content"
+import { richTextToPlain } from "@/lib/rich-text"
 
 // Shared by client forms (React Hook Form) and server actions. Forms send empty strings for
 // blank optional fields; server actions convert them to null with blankToNull().
@@ -43,7 +45,6 @@ export const clientSchema = z.object({
   status: z.enum(["active", "paused", "archived"]),
   notes: text(5000),
   is_medical: z.boolean(),
-  require_internal_review: z.boolean(),
   require_client_approval: z.boolean(),
   reapproval_on_material_change: z.boolean(),
 })
@@ -66,6 +67,7 @@ export const campaignSchema = z
     client_id: uuid,
     description: text(5000),
     target_url: optionalUrl,
+    target_location: text(120),
     priority,
     start_date: optionalDate,
     end_date: optionalDate,
@@ -74,11 +76,11 @@ export const campaignSchema = z
     monthly_target: count,
     status: z.enum(["draft", "active", "paused", "completed", "archived"]),
     is_medical: tristate,
-    require_internal_review: tristate,
     require_client_approval: tristate,
     internal_notes: text(5000),
-    primary_keyword_id: optionalUuid,
-    keyword_ids: z.array(uuid),
+    // Keywords are managed by name in the campaign forms; the server reuses or creates keyword records.
+    primary_keyword: text(200),
+    secondary_keywords: z.array(text(200).min(1)).max(50, "Add at most 50 secondary keywords"),
     intern_ids: z.array(uuid),
     backlink_type_ids: z.array(uuid),
   })
@@ -88,6 +90,24 @@ export const campaignSchema = z
   })
 export type CampaignInput = z.infer<typeof campaignSchema>
 
+/**
+ * Simplified "New campaign" form. The name, start date, status and weekly/monthly targets are derived
+ * on the server; approval settings are left to inherit from the brand.
+ */
+export const newCampaignSchema = z.object({
+  client_id: uuid,
+  primary_keyword: text(200).min(1, "Primary keyword is required"),
+  secondary_keywords: z.array(text(200).min(1)).max(50, "Add at most 50 secondary keywords"),
+  target_url: optionalUrl,
+  /** The form's Active field: Yes = active, No = draft. */
+  status: z.enum(["active", "draft"]),
+  backlink_type_ids: z.array(uuid),
+  priority,
+  description: text(5000),
+  internal_notes: text(5000),
+})
+export type NewCampaignInput = z.infer<typeof newCampaignSchema>
+
 export function tristateToDb(v: "inherit" | "yes" | "no") {
   return v === "inherit" ? null : v === "yes"
 }
@@ -95,40 +115,30 @@ export function dbToTristate(v: boolean | null): "inherit" | "yes" | "no" {
   return v === null ? "inherit" : v ? "yes" : "no"
 }
 
-export const keywordSchema = z.object({
-  keyword: text(200).min(1, "Keyword is required"),
-  client_id: uuid,
-  search_intent: z.union([z.literal(""), z.enum(["informational", "navigational", "commercial", "transactional", "local"])]),
+/** The keyword fields edited on a campaign page; keyword names are managed on the campaign forms. */
+export const keywordDetailsSchema = z.object({
   target_url: optionalUrl,
-  priority,
-  group_name: text(120),
-  notes: text(2000),
-  status: z.enum(["active", "paused", "archived"]),
-  campaign_ids: z.array(uuid),
+  search_intent: z.union([z.literal(""), z.enum(["informational", "navigational", "commercial", "transactional", "local"])]),
 })
-export type KeywordInput = z.infer<typeof keywordSchema>
+export type KeywordDetailsInput = z.infer<typeof keywordDetailsSchema>
 
 export const taskSchema = z
   .object({
-    title: text(200).min(1, "Title is required"),
-    intern_ids: z.array(uuid).min(1, "Choose at least one intern"),
-    campaign_ids: z.array(uuid).min(1, "Choose at least one campaign"),
-    keyword_id: optionalUuid,
+    client_id: z.string().uuid("Select a brand"),
+    campaign_id: z.string().uuid("Select a campaign"),
+    keyword_id: z.string().uuid("Select a keyword"),
+    intern_ids: z.array(uuid).min(1, "Choose at least one team member").max(200),
     backlink_type_id: optionalUuid,
-    cadence: z.enum(["one_off", "daily", "weekly", "monthly"]),
-    target_quantity: z.coerce.number().int().min(1, "Target must be at least 1").max(1000),
-    start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Start date is required"),
+    // each: every member gets the full quantity; shared: the quantity is split between them.
+    target_mode: z.enum(["each", "shared"]),
+    target_quantity: z.coerce.number().int("Whole numbers only").min(1, "Target must be at least 1").max(1000),
+    cadence: z.enum(["daily", "weekly", "one_off"]),
     due_date: optionalDate,
-    priority,
     instructions: text(5000),
   })
-  .refine((v) => !v.due_date || v.due_date >= v.start_date, {
-    message: "Due date must be on or after the start date",
-    path: ["due_date"],
-  })
-  .refine((v) => !v.keyword_id || v.campaign_ids.length === 1, {
-    message: "A specific keyword can only be used when assigning a single campaign",
-    path: ["keyword_id"],
+  .refine((v) => v.target_mode === "each" || v.target_quantity >= v.intern_ids.length, {
+    message: "A shared target needs at least 1 backlink per member",
+    path: ["target_quantity"],
   })
 export type TaskInput = z.infer<typeof taskSchema>
 
@@ -210,6 +220,8 @@ export const submissionSchema = z.object({
   backlink_type_id: uuid,
   keyword_id: optionalUuid,
   task_id: optionalUuid,
+  /** Client-approved Off-Page Content this placement publishes; the placement then skips client approval. */
+  offpage_content_id: optionalUuid,
   proposed_website: text(500).min(1, "Proposed website is required"),
   placement_url: optionalUrl,
   target_url: requiredUrl,
@@ -297,10 +309,10 @@ export const campaignDefaultsSchema = z.object({
   weekly_target: count,
   monthly_target: count,
   priority,
+  working_days_per_week: z.coerce.number().int("Whole numbers only").min(1, "At least 1 day").max(7, "At most 7 days"),
 })
 
 export const approvalSettingsSchema = z.object({
-  internal_review_required: z.boolean(),
   client_approval_required: z.boolean(),
   reapproval_on_material_change: z.boolean(),
   allow_admin_override: z.boolean(),
@@ -348,3 +360,17 @@ export const SETTINGS_SCHEMAS = {
   security: securitySettingsSchema,
 } as const
 export type SettingsKey = keyof typeof SETTINGS_SCHEMAS
+
+export const offpageContentSchema = z.object({
+  campaign_id: z.string().uuid("Select a campaign"),
+  keyword_id: z.string().uuid("Select a target keyword"),
+  backlink_type_id: z.string().uuid("Select a backlink type"),
+  content_type: z.enum(Object.keys(CONTENT_TYPES) as [ContentType, ...ContentType[]], "Select a content type"),
+  title: text(200).min(1, "Content title is required"),
+  content_html: z
+    .string()
+    .max(200000, "Content is too long")
+    .refine((v) => richTextToPlain(v).length > 0, "Write or paste the content"),
+})
+export type OffpageContentInput = z.infer<typeof offpageContentSchema>
+

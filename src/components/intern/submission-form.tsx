@@ -22,6 +22,8 @@ export interface InternFormOptions {
   campaigns: { id: string; label: string; target_url: string | null; type_ids: string[]; keywords: { id: string; keyword: string; target_url: string | null }[] }[]
   types: { id: string; name: string; required_fields: string[]; description: string }[]
   tasks: { id: string; label: string; campaign_id: string; keyword_id: string | null; backlink_type_id: string | null }[]
+  /** The member's client-approved Off-Page Content that is not yet used by another live submission. */
+  contents: { id: string; label: string; title: string; text: string; campaign_id: string; keyword_id: string; backlink_type_id: string }[]
 }
 
 export function SubmissionForm({ options, submission, preset }: { options: InternFormOptions; submission?: Submission; preset?: { campaign_id?: string; task_id?: string } }) {
@@ -37,6 +39,7 @@ export function SubmissionForm({ options, submission, preset }: { options: Inter
       backlink_type_id: submission?.backlink_type_id ?? presetTask?.backlink_type_id ?? "",
       keyword_id: submission?.keyword_id ?? presetTask?.keyword_id ?? "",
       task_id: submission?.task_id ?? presetTask?.id ?? "",
+      offpage_content_id: submission?.offpage_content_id ?? "",
       proposed_website: submission?.proposed_website ?? "",
       placement_url: submission?.placement_url ?? "",
       target_url: submission?.target_url ?? c0?.keywords.find((k) => k.id === presetTask?.keyword_id)?.target_url ?? c0?.target_url ?? "",
@@ -61,6 +64,8 @@ export function SubmissionForm({ options, submission, preset }: { options: Inter
   const allowedTypes = useMemo(() => options.types.filter((t) => !campaign || campaign.type_ids.length === 0 || campaign.type_ids.includes(t.id)), [options.types, campaign])
   const required = new Set(options.types.find((t) => t.id === typeId)?.required_fields ?? [])
   const tasks = options.tasks.filter((t) => t.campaign_id === campaignId)
+  const contents = options.contents.filter((c) => c.campaign_id === campaignId)
+  const contentId = useWatch({ control: form.control, name: "offpage_content_id" })
   const isRevision = Boolean(submission && submission.status !== "draft")
 
   const submit = (doSubmit: boolean) =>
@@ -82,7 +87,7 @@ export function SubmissionForm({ options, submission, preset }: { options: Inter
           <Field label="Campaign" required error={e.campaign_id?.message} htmlFor="campaign_id">
             <NativeSelect id="campaign_id" disabled={Boolean(submission)} {...form.register("campaign_id", { onChange: (ev) => {
               const c = options.campaigns.find((x) => x.id === ev.target.value)
-              form.setValue("keyword_id", ""); form.setValue("task_id", ""); form.setValue("backlink_type_id", "")
+              form.setValue("keyword_id", ""); form.setValue("task_id", ""); form.setValue("backlink_type_id", ""); form.setValue("offpage_content_id", "")
               if (c?.target_url && !form.getValues("target_url")) form.setValue("target_url", c.target_url)
             } })}>
               <option value="">Choose a campaign…</option>
@@ -139,6 +144,26 @@ export function SubmissionForm({ options, submission, preset }: { options: Inter
 
       <Section title="Content" description="Required for content-based placements such as guest posts">
         <div className="space-y-4">
+          {contents.length || contentId ? (
+            <Field
+              label="Approved Off-Page Content"
+              htmlFor="offpage_content_id"
+              hint={contentId ? "The client already approved this content, so this placement skips client approval (medical campaigns still go through medical review)." : "Optional: publish content the client has already approved. Choosing it fills in the title and draft."}
+            >
+              <NativeSelect id="offpage_content_id" {...form.register("offpage_content_id", { onChange: (ev) => {
+                const c = options.contents.find((x) => x.id === ev.target.value)
+                if (!c) return
+                form.setValue("content_title", c.title)
+                form.setValue("content_draft", c.text)
+                if (!form.getValues("keyword_id")) form.setValue("keyword_id", c.keyword_id)
+                if (!form.getValues("backlink_type_id") && allowedTypes.some((t) => t.id === c.backlink_type_id)) form.setValue("backlink_type_id", c.backlink_type_id)
+              } })}>
+                <option value="">Not linked to approved content</option>
+                {contents.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                {contentId && !contents.some((c) => c.id === contentId) ? <option value={contentId}>Linked content</option> : null}
+              </NativeSelect>
+            </Field>
+          ) : null}
           <Field label="Content title" required={req("content_title")} error={e.content_title?.message} htmlFor="content_title"><Input id="content_title" {...form.register("content_title")} /></Field>
           <Field label="Content draft" required={req("content_draft")} error={e.content_draft?.message} htmlFor="content_draft"><Textarea id="content_draft" rows={14} className="font-[inherit] leading-relaxed" {...form.register("content_draft")} /></Field>
           <Field label="Notes for the reviewer" htmlFor="notes"><Textarea id="notes" rows={3} {...form.register("notes")} /></Field>

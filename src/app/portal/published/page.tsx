@@ -17,7 +17,7 @@ export default async function PortalPublished() {
   return (
     <>
       <PageHeader title="Published Backlinks" description="Live placements and their latest verification. “Live” means our system confirmed the link to your page is present." />
-      <DataTable
+      <DataTable cards={{ title: "url", badge: "status" }}
         searchPlaceholder="Search URL, campaign…"
         columns={[
           { key: "url", header: "Published URL", sortable: true },

@@ -1,14 +1,14 @@
 "use client"
 
-import { Fragment, useEffect, useState, useSyncExternalStore, useTransition } from "react"
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
-import { Bell, ChevronRight, LogOut, Monitor, Moon, Search, Sun } from "lucide-react"
+import { Bell, ChevronRight, LogOut, Monitor, Moon, Search, Sun, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
+  Command,
   CommandDialog,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ToneBadge } from "@/components/shared/status-badge"
 import { getRecentNotifications, markNotificationsRead } from "@/server/notifications"
 import { globalSearch, type SearchHit } from "@/server/search"
 import { signOut } from "@/server/auth-actions"
@@ -32,6 +33,7 @@ import { initials, timeAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { can } from "@/lib/permissions"
 import type { Notification } from "@/lib/types"
+import type { Tone } from "@/lib/workflow"
 import type { ShellUser } from "@/components/app-shell/app-shell"
 
 export function Topbar({
@@ -82,16 +84,23 @@ function canSearch(user: ShellUser) {
   return user.role === "client" && can(user.permissions, "portal.approvals")
 }
 
+const BRAND_STATUS_TONE: Record<string, Tone> = { active: "success", paused: "warning", archived: "muted" }
+
+const isMacPlatform = () => /Mac|iPhone|iPad|iPod/.test(navigator.userAgent)
+
 function GlobalSearch() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState("")
-  const [hits, setHits] = useState<SearchHit[]>([])
-  const [loading, startTransition] = useTransition()
+  // Results are keyed by the query they answer, so a slow response never replaces a newer one.
+  const [result, setResult] = useState<{ q: string; hits: SearchHit[]; error?: string } | null>(null)
+  const isMac = useSyncExternalStore(subscribeNoop, isMacPlatform, () => null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
+      // Autofill and datalist picks fire keydown events without a key, so guard before lowercasing.
+      if (e.key?.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
         setOpen((o) => !o)
       }
@@ -100,19 +109,28 @@ function GlobalSearch() {
     return () => window.removeEventListener("keydown", onKey)
   }, [])
 
+  const term = q.trim()
   useEffect(() => {
-    if (q.trim().length < 2) return
-    const t = setTimeout(() => {
-      startTransition(async () => {
-        const r = await globalSearch(q)
-        setHits(r.ok ? (r.data ?? []) : [])
-      })
+    if (term.length < 2) return
+    let cancelled = false
+    const t = setTimeout(async () => {
+      try {
+        const r = await globalSearch(term)
+        if (!cancelled) setResult(r.ok ? { q: term, hits: r.data ?? [] } : { q: term, hits: [], error: r.error })
+      } catch {
+        if (!cancelled) setResult({ q: term, hits: [], error: "Search failed. Check your connection and try again." })
+      }
     }, 250)
-    return () => clearTimeout(t)
-  }, [q])
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+  }, [term])
 
-  const visibleHits = q.trim().length >= 2 ? hits : []
-  const groups = visibleHits.reduce<Record<string, SearchHit[]>>((acc, h) => {
+  const active = term.length >= 2
+  const current = active && result?.q === term ? result : null
+  const loading = active && !current
+  const groups = (current?.hits ?? []).reduce<Record<string, SearchHit[]>>((acc, h) => {
     ;(acc[h.group] ??= []).push(h)
     return acc
   }, {})
@@ -125,39 +143,67 @@ function GlobalSearch() {
         className="w-9 justify-center text-muted-foreground sm:w-56 sm:justify-start"
         onClick={() => setOpen(true)}
         aria-label="Search"
+        aria-keyshortcuts="Meta+K Control+K"
       >
         <Search />
         <span className="hidden flex-1 text-left sm:inline">Search…</span>
-        <kbd className="hidden rounded border bg-muted px-1 text-[10px] sm:inline">⌘K</kbd>
+        {isMac !== null ? <kbd className="hidden rounded border bg-muted px-1 text-[10px] sm:inline">{isMac ? "⌘K" : "Ctrl K"}</kbd> : null}
       </Button>
-      <CommandDialog open={open} onOpenChange={setOpen} title="Search" description="Search across the platform">
-        <CommandInput placeholder="Search clients, campaigns, submissions, keywords…" value={q} onValueChange={setQ} />
-        <CommandList>
-          {q.trim().length >= 2 && !loading ? <CommandEmpty>No results.</CommandEmpty> : null}
-          {loading && visibleHits.length === 0 ? (
-            <div className="space-y-2 p-3">
-              <Skeleton className="h-6" />
-              <Skeleton className="h-6" />
-            </div>
-          ) : null}
-          {Object.entries(groups).map(([group, items]) => (
-            <CommandGroup key={group} heading={group}>
-              {items.map((h) => (
-                <CommandItem
-                  key={h.href + h.label}
-                  value={`${h.group} ${h.label} ${h.hint ?? ""}`}
-                  onSelect={() => {
-                    setOpen(false)
-                    router.push(h.href)
-                  }}
-                >
-                  <span className="truncate">{h.label}</span>
-                  {h.hint ? <span className="ml-auto truncate text-xs text-muted-foreground">{h.hint}</span> : null}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          ))}
-        </CommandList>
+      <CommandDialog open={open} onOpenChange={setOpen} title="Search" description="Search across the platform" className="max-w-[calc(100%-2rem)] sm:max-w-lg">
+        <Command shouldFilter={false}>
+          <div className="relative">
+            <CommandInput ref={inputRef} placeholder="Search brands, campaigns, submissions, keywords…" value={q} onValueChange={setQ} className="pr-7" />
+            {q ? (
+              <button
+                type="button"
+                aria-label="Clear search"
+                className="absolute top-1/2 right-2.5 mt-0.5 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => {
+                  setQ("")
+                  inputRef.current?.focus()
+                }}
+              >
+                <X className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
+          <CommandList>
+            {!active ? <p className="px-3 py-6 text-center text-sm text-muted-foreground">Type at least 2 characters to search.</p> : null}
+            {loading ? (
+              <div className="space-y-2 p-3" aria-busy="true" aria-label="Searching">
+                <Skeleton className="h-6" />
+                <Skeleton className="h-6" />
+              </div>
+            ) : null}
+            {current?.error ? (
+              <p role="alert" className="px-3 py-6 text-center text-sm text-destructive">
+                {current.error}
+              </p>
+            ) : current && current.hits.length === 0 ? (
+              <p className="px-3 py-6 text-center text-sm text-muted-foreground">No results for &ldquo;{term}&rdquo;.</p>
+            ) : null}
+            {Object.entries(groups).map(([group, items]) => (
+              <CommandGroup key={group} heading={group}>
+                {items.map((h) => (
+                  <CommandItem
+                    key={h.href + h.label}
+                    value={h.href + h.label}
+                    onSelect={() => {
+                      setOpen(false)
+                      router.push(h.href)
+                    }}
+                  >
+                    <span className="min-w-0 truncate">{h.label}</span>
+                    <span className="ml-auto flex shrink-0 items-center gap-2">
+                      {h.hint ? <span className="max-w-40 truncate text-xs text-muted-foreground">{h.hint}</span> : null}
+                      {h.status ? <ToneBadge tone={BRAND_STATUS_TONE[h.status] ?? "neutral"}>{h.status.charAt(0).toUpperCase() + h.status.slice(1)}</ToneBadge> : null}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ))}
+          </CommandList>
+        </Command>
       </CommandDialog>
     </>
   )

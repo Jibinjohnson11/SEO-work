@@ -34,7 +34,7 @@ export function GeneralSettings({ initial }: { initial: { platform_name: string;
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Platform name" htmlFor="g-name"><Input id="g-name" value={value.platform_name} onChange={(e) => set("platform_name", e.target.value)} /></Field>
         <Field label="Logo URL" hint="Square image, https://" htmlFor="g-logo"><Input id="g-logo" value={value.logo_url} onChange={(e) => set("logo_url", e.target.value)} /></Field>
-        <Field label="Default time zone" hint="Pre-filled for new clients" htmlFor="g-tz">
+        <Field label="Default time zone" hint="Pre-filled for new brands" htmlFor="g-tz">
           <NativeSelect id="g-tz" value={value.default_timezone} onChange={(e) => set("default_timezone", e.target.value)}>{TIMEZONES.map((t) => <option key={t}>{t}</option>)}</NativeSelect>
         </Field>
         <Field label="Date format" htmlFor="g-date">
@@ -51,34 +51,34 @@ export function GeneralSettings({ initial }: { initial: { platform_name: string;
   )
 }
 
-export function CampaignDefaults({ initial }: { initial: { daily_target: number; weekly_target: number; monthly_target: number; priority: string } }) {
+export function CampaignDefaults({ initial }: { initial: { daily_target: number; weekly_target: number; monthly_target: number; priority: string; working_days_per_week: number } }) {
   const { value, set, footer } = useSection("campaign_defaults", initial)
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">Pre-filled when creating campaigns and inviting interns. Campaign statuses (Draft, Active, Paused, Completed, Archived) and priorities (Low → Urgent) are fixed so reports stay comparable.</p>
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-5">
         <Field label="Daily target" htmlFor="c-d"><Input id="c-d" type="number" min={0} value={value.daily_target} onChange={(e) => set("daily_target", num(e.target.value))} /></Field>
         <Field label="Weekly target" htmlFor="c-w"><Input id="c-w" type="number" min={0} value={value.weekly_target} onChange={(e) => set("weekly_target", num(e.target.value))} /></Field>
         <Field label="Monthly target" htmlFor="c-m"><Input id="c-m" type="number" min={0} value={value.monthly_target} onChange={(e) => set("monthly_target", num(e.target.value))} /></Field>
         <Field label="Default priority" htmlFor="c-p">
           <NativeSelect id="c-p" value={value.priority} onChange={(e) => set("priority", e.target.value)}>{["low", "medium", "high", "urgent"].map((p) => <option key={p} value={p}>{p}</option>)}</NativeSelect>
         </Field>
+        <Field label="Working days / week" htmlFor="c-wd" hint="New campaigns: weekly and monthly targets from the daily target"><Input id="c-wd" type="number" min={1} max={7} value={value.working_days_per_week} onChange={(e) => set("working_days_per_week", num(e.target.value))} /></Field>
       </div>
       {footer}
     </div>
   )
 }
 
-export function ApprovalSettings({ initial }: { initial: { internal_review_required: boolean; client_approval_required: boolean; reapproval_on_material_change: boolean; allow_admin_override: boolean; medical_review_required: boolean; medical_checklist: string[]; notify_admins_on_submission: boolean; notify_client_on_forward: boolean } }) {
+export function ApprovalSettings({ initial }: { initial: { client_approval_required: boolean; reapproval_on_material_change: boolean; allow_admin_override: boolean; medical_review_required: boolean; medical_checklist: string[]; notify_admins_on_submission: boolean; notify_client_on_forward: boolean } }) {
   const { value, set, footer } = useSection("approval", initial)
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">The first three are defaults for new clients; each client and campaign can override them.</p>
+      <p className="text-sm text-muted-foreground">Client approval is the approval stage. Internal review applies only to medical brands and campaigns, while medical review is required. The first two switches are defaults for new brands; each brand and campaign can override client approval.</p>
       <div className="grid gap-2 md:grid-cols-2">
-        <SwitchField label="Internal review required" checked={value.internal_review_required} onCheckedChange={(c) => set("internal_review_required", c)} />
         <SwitchField label="Client approval required" checked={value.client_approval_required} onCheckedChange={(c) => set("client_approval_required", c)} />
         <SwitchField label="Re-approval after material edits" description="Editing approved content sends it back to the client" checked={value.reapproval_on_material_change} onCheckedChange={(c) => set("reapproval_on_material_change", c)} />
-        <SwitchField label="Medical review required for medical campaigns" description="Approval is blocked until the medical checklist is confirmed by a person" checked={value.medical_review_required} onCheckedChange={(c) => set("medical_review_required", c)} />
+        <SwitchField label="Medical review required for medical campaigns" description="Medical brands and campaigns always go through internal review, and approval is blocked until a person confirms the medical checklist" checked={value.medical_review_required} onCheckedChange={(c) => set("medical_review_required", c)} />
         <SwitchField label="Allow admin override of client approval" description="Always logged and shown as an override — never as a client approval. The client is notified." checked={value.allow_admin_override} onCheckedChange={(c) => set("allow_admin_override", c)} />
       </div>
       <Field label="Medical review checklist" hint="Shown to reviewers on medical submissions">
@@ -119,7 +119,7 @@ export function ReportSettings({ initial, emailConfigured }: { initial: { schedu
           <NativeSelect id="r-s" value={value.schedule} onChange={(e) => set("schedule", e.target.value)}><option value="off">Off</option><option value="daily">Daily (yesterday)</option><option value="weekly">Weekly (Mondays, last week)</option><option value="monthly">Monthly (1st, last month)</option></NativeSelect>
         </Field>
         <Field label="Email attachment format" htmlFor="r-f"><NativeSelect id="r-f" value={value.format} onChange={(e) => set("format", e.target.value)}><option value="xlsx">Excel</option><option value="csv">CSV</option><option value="pdf">PDF</option></NativeSelect></Field>
-        <Field label="Reporting time zone" htmlFor="r-tz" hint="Single-client reports use the client's own zone">
+        <Field label="Reporting time zone" htmlFor="r-tz" hint="Single-brand reports use the brand's own zone">
           <NativeSelect id="r-tz" value={value.timezone} onChange={(e) => set("timezone", e.target.value)}>{TIMEZONES.map((t) => <option key={t}>{t}</option>)}</NativeSelect>
         </Field>
       </div>
@@ -137,7 +137,7 @@ export function NotificationSettings({ initial, emailConfigured }: { initial: { 
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">In-app notifications are always on and de-duplicated per event. Email sends one digest of unread notifications per user in the daily job.</p>
       <SwitchField label="Email notification digests" description={emailConfigured ? "Users can opt out on their profile" : "Email provider not configured — set RESEND_API_KEY and EMAIL_FROM to enable."} checked={value.email_enabled} onCheckedChange={(c) => set("email_enabled", c)} disabled={!emailConfigured && !value.email_enabled} />
-      <Field label="Warn interns about deadlines (days before due)" htmlFor="n-days" className="max-w-xs"><Input id="n-days" type="number" min={0} max={30} value={value.deadline_warning_days} onChange={(e) => set("deadline_warning_days", num(e.target.value))} /></Field>
+      <Field label="Warn team members about deadlines (days before due)" htmlFor="n-days" className="max-w-xs"><Input id="n-days" type="number" min={0} max={30} value={value.deadline_warning_days} onChange={(e) => set("deadline_warning_days", num(e.target.value))} /></Field>
       {footer}
     </div>
   )

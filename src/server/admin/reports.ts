@@ -5,31 +5,32 @@ import { z } from "zod"
 import { authorize } from "@/lib/auth"
 import { must, run } from "@/lib/actions"
 import { getSetting } from "@/server/queries"
-import { reportContext, reportToExport } from "@/server/report-data"
+import { unifiedReport, unifiedToExport } from "@/server/unified-report"
 
 const id = z.string().uuid()
-const kindSchema = z.enum(["daily", "weekly", "monthly", "custom"])
-
-/** Freezes the current report view into a snapshot that can be published to a client. */
-export async function saveReportSnapshot(kind: "daily" | "weekly" | "monthly" | "custom", query: string, title: string) {
+/**
+ * Freezes the current Reports view into a snapshot (stored once; switching periods never writes
+ * anything). Yearly and custom periods use the "custom" kind; filters.period keeps the exact type.
+ */
+export async function saveReportSnapshot(query: string, title: string) {
   return run(async () => {
     const { supabase, userId } = await authorize(["super_admin"])
     const sp = Object.fromEntries(new URLSearchParams(z.string().max(2000).parse(query)))
-    const reports = await getSetting("reports")
-    const defaultPeriod = kind === "weekly" ? "this_week" : kind === "monthly" ? "this_month" : "today"
-    const ctx = await reportContext(supabase, sp, { period: defaultPeriod, reportTz: reports.timezone })
-    const doc = reportToExport(ctx, z.string().trim().min(1).max(200).parse(title))
+    const { timezone } = await getSetting("reports")
+    const ctx = await unifiedReport(supabase, sp, timezone)
+    const doc = unifiedToExport(ctx, z.string().trim().min(1).max(200).parse(title))
+    const kind = ctx.range.period === "yearly" ? "custom" : ctx.range.period
     const row = must(
       await supabase
         .from("reports")
         .insert({
-          kind: kindSchema.parse(kind),
+          kind,
           client_id: ctx.filters.client || null,
           title: doc.title,
-          period_start: ctx.period.from,
-          period_end: ctx.period.to,
+          period_start: ctx.range.from,
+          period_end: ctx.range.to,
           timezone: ctx.timeZone,
-          filters: sp,
+          filters: { ...sp, period: ctx.range.period },
           data: doc,
           generated_by: userId,
         })

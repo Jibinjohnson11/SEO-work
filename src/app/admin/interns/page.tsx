@@ -9,11 +9,12 @@ import { ProgressBar } from "@/components/shared/stat-card"
 import { InviteUserButton } from "@/components/admin/invite-user"
 import { UserMenu } from "@/components/admin/user-actions"
 import { formatDay } from "@/lib/format"
+import { teamRoleLabel } from "@/lib/team"
 import { getLookups, getSetting, param, resolvePeriod, type SearchParams } from "@/server/queries"
 import { internMetrics } from "@/server/intern-metrics"
 import type { Profile } from "@/lib/types"
 
-export const metadata = { title: "Interns" }
+export const metadata = { title: "Team" }
 
 export default async function InternsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams
@@ -35,11 +36,11 @@ export default async function InternsPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader
-        title="Interns"
+        title="Team"
         description={`Performance for ${period.from === period.to ? formatDay(period.from) : `${formatDay(period.from)} – ${formatDay(period.to)}`} — based on approved and verified outcomes, not only volume.`}
         actions={
           <InviteUserButton role="intern" campaigns={campaignOptions} defaults={defaults}>
-            <UserPlus /> Invite intern
+            <UserPlus /> Add Team Member
           </InviteUserButton>
         }
       />
@@ -50,10 +51,11 @@ export default async function InternsPage({ searchParams }: { searchParams: Prom
           { type: "select", key: "status", label: "Status", options: [{ value: "active", label: "Active" }, { value: "invited", label: "Invited" }, { value: "disabled", label: "Disabled" }] },
         ]}
       />
-      <DataTable
-        searchPlaceholder="Search interns…"
+      <DataTable cards={{ title: "name", badge: "status", actions: "actions" }}
+        searchPlaceholder="Search team members…"
         columns={[
-          { key: "name", header: "Intern", sortable: true },
+          { key: "name", header: "Team Member", sortable: true },
+          { key: "role", header: "Role", sortable: true },
           { key: "campaigns", header: "Campaigns", sortable: true, align: "right" },
           { key: "tasks", header: "Open tasks", sortable: true, align: "right" },
           { key: "targets", header: "Daily / weekly target" },
@@ -70,8 +72,9 @@ export default async function InternsPage({ searchParams }: { searchParams: Prom
           const camps = assignedTo(p.id)
           return {
             id: p.id,
+            href: `/admin/interns/${p.id}`,
             search: `${p.full_name} ${p.email} ${p.job_title ?? ""}`,
-            sort: { name: p.full_name || p.email, campaigns: camps.length, tasks: m?.open_tasks ?? 0, submitted: m?.submitted ?? 0, approved: m?.client_approved ?? 0, live: m?.verified_live ?? 0, revision: m?.revision_rate ?? 0, completion: m?.target_completion ?? 0, status: p.status },
+            sort: { name: p.full_name || p.email, role: teamRoleLabel(p.job_title), campaigns: camps.length, tasks: m?.open_tasks ?? 0, submitted: m?.submitted ?? 0, approved: m?.client_approved ?? 0, live: m?.verified_live ?? 0, revision: m?.revision_rate ?? 0, completion: m?.target_completion ?? 0, status: p.status },
             cells: {
               name: (
                 <Link href={`/admin/interns/${p.id}`} className="group block">
@@ -79,6 +82,7 @@ export default async function InternsPage({ searchParams }: { searchParams: Prom
                   <span className="block text-xs text-muted-foreground">{p.email}{p.joining_date ? ` · joined ${formatDay(p.joining_date, general.date_format)}` : ""}</span>
                 </Link>
               ),
+              role: <ToneBadge tone="neutral">{teamRoleLabel(p.job_title)}</ToneBadge>,
               campaigns: camps.length,
               tasks: m?.open_tasks ?? 0,
               targets: <span className="tabular text-xs">{p.daily_target} / {p.weekly_target}</span>,
@@ -92,7 +96,7 @@ export default async function InternsPage({ searchParams }: { searchParams: Prom
             },
           }
         })}
-        empty={{ title: "No interns yet", description: "Invite interns and assign them to campaigns." }}
+        empty={{ title: "No team members yet", description: "Add team members and assign them to campaigns." }}
       />
     </>
   )

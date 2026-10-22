@@ -27,7 +27,7 @@ export default async function InternSubmissions({ searchParams }: { searchParams
     <>
       <PageHeader title="My Submissions" description="Your opportunities and drafts with their approval status and feedback." actions={can(permissions, "intern.submissions.manage") ? <LinkButton href="/intern/submissions/new" variant="default"><Plus /> New submission</LinkButton> : null} />
       <FilterBar presets={presets} filters={[{ type: "select", key: "status", label: "Status", options: [{ value: "attention", label: "Needs my action" }, ...SUBMISSION_STATUSES.map((s) => ({ value: s, label: SUBMISSION_STATUS[s].label }))] }]} />
-      <DataTable
+      <DataTable cards={{ title: "code", badge: "status" }}
         searchPlaceholder="Search code, website, title…"
         columns={[
           { key: "code", header: "Submission", sortable: true },
@@ -40,6 +40,7 @@ export default async function InternSubmissions({ searchParams }: { searchParams
         ]}
         rows={subs.map((s) => ({
           id: s.id,
+          href: `/intern/submissions/${s.id}`,
           search: `${s.code} ${s.proposed_website} ${s.content_title ?? ""} ${s.campaigns.code}`,
           sort: { code: s.code, campaign: s.campaigns.code, type: s.backlink_types.name, submitted: s.first_submitted_at, updated: s.updated_at, status: s.status },
           cells: {

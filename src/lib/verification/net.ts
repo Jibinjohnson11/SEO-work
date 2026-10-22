@@ -9,8 +9,8 @@ import type { LookupFunction } from "node:net"
 // Runtime-specific transport:
 // - Node.js: node:http(s) with a lookup hook that checks every resolved address at connect
 //   time (defeats DNS rebinding).
-// - Cloudflare Workers: fetch(); the "global_fetch_strictly_public" compatibility flag (see
-//   wrangler.jsonc) makes the platform refuse private/internal destinations.
+// - Cloudflare Workers (not a current deploy target): fetch(); the "global_fetch_strictly_public"
+//   compatibility flag makes the platform refuse private/internal destinations.
 
 // ---------------------------------------------------------------------------
 // IP classification (pure TypeScript so it runs in every runtime)

@@ -92,7 +92,10 @@ export interface Client {
   require_client_approval: boolean
   reapproval_on_material_change: boolean
   portal_settings: Partial<PortalSettings>
+  logo_path: string | null
+  created_by: string | null
   created_at: string
+  updated_at: string
   archived_at: string | null
 }
 
@@ -103,6 +106,7 @@ export interface Campaign {
   client_id: string
   description: string | null
   target_url: string | null
+  target_location: string | null
   priority: Priority
   start_date: string | null
   end_date: string | null
@@ -114,7 +118,9 @@ export interface Campaign {
   require_internal_review: boolean | null
   require_client_approval: boolean | null
   internal_notes: string | null
+  created_by: string | null
   created_at: string
+  updated_at: string
   archived_at: string | null
 }
 
@@ -169,6 +175,8 @@ export interface Submission {
   campaign_id: string
   keyword_id: string | null
   task_id: string | null
+  /** Client-approved Off-Page Content this placement publishes (20261023000021). */
+  offpage_content_id: string | null
   intern_id: string
   backlink_type_id: string
   proposed_website: string

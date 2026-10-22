@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Controller, useForm, useWatch } from "react-hook-form"
+import { TeamRoleField } from "@/components/admin/team-role-field"
 import { zodResolver } from "@hookform/resolvers/zod"
 import type { z } from "zod"
 import { Button } from "@/components/ui/button"
@@ -40,7 +41,7 @@ export function InviteUserButton({
       <FormDialog
         open={open}
         onOpenChange={setOpen}
-        title={role === "client" ? "Invite client user" : role === "intern" ? "Invite intern" : "Invite user"}
+        title={role === "client" ? "Invite client user" : role === "intern" ? "Add Team Member" : "Invite user"}
         description="They receive an email link to set a password. Super Admin access cannot be granted here."
       >
         {open ? (
@@ -103,14 +104,18 @@ function InviteForm({
         {role ? null : (
           <Field label="Role" htmlFor="role">
             <NativeSelect id="role" {...form.register("role")}>
-              <option value="intern">Intern</option>
+              <option value="intern">Team member</option>
               <option value="client">Client</option>
             </NativeSelect>
           </Field>
         )}
-        <Field label="Job title" htmlFor="job_title">
-          <Input id="job_title" {...form.register("job_title")} />
-        </Field>
+        {selectedRole === "intern" ? (
+          <Controller control={form.control} name="job_title" render={({ field }) => <TeamRoleField value={field.value ?? ""} onChange={field.onChange} error={e.job_title?.message} />} />
+        ) : (
+          <Field label="Job title" htmlFor="job_title">
+            <Input id="job_title" {...form.register("job_title")} />
+          </Field>
+        )}
       </div>
       {selectedRole === "intern" ? (
         <>
@@ -137,9 +142,9 @@ function InviteForm({
       ) : (
         <>
           {fixedClientId ? null : (
-            <Field label="Client workspace" required htmlFor="client_id" error={e.client_id?.message}>
+            <Field label="Brand workspace" required htmlFor="client_id" error={e.client_id?.message}>
               <NativeSelect id="client_id" {...form.register("client_id")}>
-                <option value="">Choose a client…</option>
+                <option value="">Choose a brand…</option>
                 {clients.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}

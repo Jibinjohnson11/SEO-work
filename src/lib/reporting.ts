@@ -33,10 +33,10 @@ export type Dimension = (typeof DIMENSIONS)[number]
 
 export const DIMENSION_LABEL: Record<Dimension, string> = {
   date: "Date",
-  client: "Client",
+  client: "Brand",
   campaign: "Campaign",
   keyword: "Keyword",
-  intern: "Intern",
+  intern: "Team Member",
   backlink_type: "Backlink Type",
 }
 
@@ -156,7 +156,7 @@ export function utcRange(from: string, to: string, timeZone: string) {
   return { start: zonedDayStart(from, timeZone), end: zonedDayStart(addDays(to, 1), timeZone) }
 }
 
-export type PeriodPreset = "today" | "yesterday" | "this_week" | "last_week" | "this_month" | "last_month" | "last_7" | "last_30"
+export type PeriodPreset = "today" | "yesterday" | "this_week" | "last_week" | "this_month" | "last_month" | "last_7" | "last_30" | "this_year"
 
 export function presetRange(preset: PeriodPreset, timeZone: string, now: Date = new Date()) {
   const today = todayIn(timeZone, now)
@@ -183,6 +183,8 @@ export function presetRange(preset: PeriodPreset, timeZone: string, now: Date = 
       return { from: addDays(today, -6), to: today }
     case "last_30":
       return { from: addDays(today, -29), to: today }
+    case "this_year":
+      return { from: `${today.slice(0, 4)}-01-01`, to: today }
   }
 }
 
@@ -395,4 +397,15 @@ export function dailySeries(events: ReportEvent[], from: string, to: string, tim
 export function percent(numerator: number, denominator: number) {
   if (!denominator) return 0
   return Math.round((numerator / denominator) * 1000) / 10
+}
+
+/**
+ * Scheduled reports: whether `today` is a run day for the schedule, and a day inside the period the run
+ * reports on (daily → yesterday, weekly → last week on Mondays, monthly → last month on the 1st).
+ */
+export function scheduledReportAnchor(schedule: string, today: string): string | null {
+  if (schedule === "daily") return addDays(today, -1)
+  if (schedule === "weekly") return weekStart(today) === today ? addDays(today, -7) : null
+  if (schedule === "monthly") return today.endsWith("-01") ? addDays(monthStart(today), -1) : null
+  return null
 }

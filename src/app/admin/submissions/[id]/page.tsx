@@ -27,7 +27,7 @@ export default async function AdminSubmissionPage({ params }: { params: Promise<
     <>
       <PageHeader
         title={`${s.code} · ${s.content_title ?? s.proposed_domain}`}
-        description={<span>By {intern?.full_name || intern?.email || "intern"} · <StageSummary d={d} /></span>}
+        description={<span>By {intern?.full_name || intern?.email || "team member"} · <StageSummary d={d} /></span>}
       />
       <AdminActions submission={s} actions={actions} interns={lookups.interns.filter((i) => i.status === "active").map((i) => ({ id: i.id, label: i.full_name || i.email }))} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">

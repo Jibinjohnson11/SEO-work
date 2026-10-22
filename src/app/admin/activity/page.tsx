@@ -60,10 +60,10 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
           { type: "select", key: "action", label: "Kind", options: [{ value: "workflow", label: "Workflow decisions" }, { value: "override", label: "Admin overrides" }, { value: "data", label: "Data changes" }, { value: "auth", label: "Sign-ins" }] },
           { type: "select", key: "entity", label: "Record type", options: ["backlink_submissions", "clients", "campaigns", "keywords", "tasks", "profiles", "published_backlinks", "application_settings", "intern_assignments", "client_members", "backlink_types", "reports"].map((e) => ({ value: e, label: e.replace(/_/g, " ") })) },
           { type: "select", key: "actor", label: "User", options: (actors ?? []).map((a) => ({ value: a.id, label: a.full_name || a.email })) },
-          { type: "select", key: "client", label: "Client", options: lookups.clients.map((c) => ({ value: c.id, label: c.company_name })) },
+          { type: "select", key: "client", label: "Brand", options: lookups.clients.map((c) => ({ value: c.id, label: c.company_name })) },
         ]}
       />
-      <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="surface overflow-hidden">
         {logs.length === 0 ? <EmptyState title="No activity matches" /> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

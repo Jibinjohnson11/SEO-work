@@ -151,3 +151,16 @@ describe("dailySeries", () => {
     ])
   })
 })
+
+describe("scheduledReportAnchor", () => {
+  it("picks a day in the previous period on run days only", async () => {
+    const { scheduledReportAnchor, weekStart } = await import("@/lib/reporting")
+    expect(scheduledReportAnchor("daily", "2026-03-01")).toBe("2026-02-28")
+    expect(scheduledReportAnchor("monthly", "2026-03-01")).toBe("2026-02-28")
+    expect(scheduledReportAnchor("monthly", "2026-03-02")).toBeNull()
+    const monday = weekStart("2026-10-21")
+    expect(scheduledReportAnchor("weekly", monday)).toBe(new Date(Date.parse(`${monday}T00:00:00Z`) - 7 * 86400_000).toISOString().slice(0, 10))
+    expect(scheduledReportAnchor("weekly", "2026-10-21") === null || weekStart("2026-10-21") === "2026-10-21").toBe(true)
+    expect(scheduledReportAnchor("off", "2026-03-01")).toBeNull()
+  })
+})

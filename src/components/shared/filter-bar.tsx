@@ -81,7 +81,7 @@ export function FilterBar({
               <NativeSelect
                 value={params.get(f.key) ?? ""}
                 onChange={(e) => setParams({ [f.key]: e.target.value })}
-                className="w-auto min-w-36"
+                className="h-10 w-auto min-w-36"
               >
                 <option value="">{f.allLabel ?? `All`}</option>
                 {f.options.map((o) => (
@@ -106,7 +106,7 @@ export function FilterBar({
                       : { period: e.target.value, from: null, to: null },
                   )
                 }
-                className="w-auto min-w-36"
+                className="h-10 w-auto min-w-36"
               >
                 {(f.presets ?? PERIOD_PRESETS).map((p) => (
                   <option key={p.value} value={p.value}>
@@ -119,11 +119,11 @@ export function FilterBar({
               <>
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-medium text-muted-foreground">From</span>
-                  <Input type="date" className="h-8 w-auto" value={params.get("from") ?? ""} onChange={(e) => setParams({ period: "custom", from: e.target.value })} />
+                  <Input type="date" className="h-10 w-auto" value={params.get("from") ?? ""} onChange={(e) => setParams({ period: "custom", from: e.target.value })} />
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-medium text-muted-foreground">To</span>
-                  <Input type="date" className="h-8 w-auto" value={params.get("to") ?? ""} onChange={(e) => setParams({ period: "custom", to: e.target.value })} />
+                  <Input type="date" className="h-10 w-auto" value={params.get("to") ?? ""} onChange={(e) => setParams({ period: "custom", to: e.target.value })} />
                 </label>
               </>
             ) : null}
@@ -134,7 +134,7 @@ export function FilterBar({
         {active ? (
           <Button
             variant="ghost"
-            size="sm"
+            className="h-10"
             onClick={() => startTransition(() => router.replace(pathname, { scroll: false }))}
           >
             <X /> Reset
@@ -172,12 +172,12 @@ function SearchFilter({
     <label className="flex flex-col gap-1">
       <span className="text-[11px] font-medium text-muted-foreground">{def.label}</span>
       <span className="relative">
-        <Search className="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground" />
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={def.placeholder ?? "Search…"}
-          className="h-8 w-56 rounded-lg border border-input bg-transparent pr-2 pl-8 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          className="h-10 w-56 rounded-lg border border-input bg-card pr-3 pl-9 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
         />
       </span>
     </label>
@@ -192,7 +192,7 @@ function PresetMenu({ presets, page, query }: { presets: SavedPreset[]; page: st
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
+        <DropdownMenuTrigger render={<Button variant="outline" className="h-10 px-3" />}>
           <Bookmark /> Presets
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">

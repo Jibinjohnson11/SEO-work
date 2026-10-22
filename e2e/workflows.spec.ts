@@ -51,42 +51,41 @@ test.describe.serial("agency workflow @writes", () => {
   }
 
   // ---- 1. clients and campaigns ----------------------------------------------------------------
-  test("the Super Admin creates a client (client approval on, internal review off)", async ({ page }) => {
+  test("the Super Admin creates a client (client approval on)", async ({ page }) => {
     await signInOnce(page, ctx.adminEmail)
     await page.goto("/admin/clients")
-    await page.getByRole("button", { name: "New client" }).click()
+    await page.getByRole("button", { name: "New brand" }).click()
     await page.locator("#company_name").fill(ctx.clientName)
     await page.locator("#website_url").fill("https://www.iana.org")
-    await setSwitch(page, "Internal review required", false)
     await setSwitch(page, "Client approval required", true)
-    await page.getByRole("button", { name: "Create client" }).click()
+    await page.getByRole("button", { name: "Create brand" }).click()
     await expect(page).toHaveURL(/\/admin\/clients\/[0-9a-f-]{36}$/)
     ctx.clientId = page.url().split("/").pop()!
     await expect(page.getByRole("heading", { name: ctx.clientName })).toBeVisible()
-    const c = await admin().from("clients").select("company_name, require_internal_review, require_client_approval").eq("id", ctx.clientId).single()
-    expect(c.data).toEqual({ company_name: ctx.clientName, require_internal_review: false, require_client_approval: true })
+    const c = await admin().from("clients").select("company_name, require_client_approval").eq("id", ctx.clientId).single()
+    expect(c.data).toEqual({ company_name: ctx.clientName, require_client_approval: true })
   })
 
-  test("the Super Admin edits the client", async ({ page }) => {
+  test("the Super Admin edits the client (internal review off)", async ({ page }) => {
     await signInOnce(page, ctx.adminEmail)
     await page.goto(`/admin/clients/${ctx.clientId}`)
     await page.getByRole("button", { name: "Edit", exact: true }).first().click()
     await page.locator("#industry").fill(`Reserved domains ${RUN}`)
     await page.locator("#contact_person").fill("E2E Contact")
+    await setSwitch(page, "Internal review required", false)
     await page.getByRole("button", { name: "Save changes" }).click()
     await expect(page.getByRole("dialog")).toBeHidden()
-    const c = await admin().from("clients").select("industry, contact_person").eq("id", ctx.clientId).single()
-    expect(c.data).toEqual({ industry: `Reserved domains ${RUN}`, contact_person: "E2E Contact" })
+    const c = await admin().from("clients").select("industry, contact_person, require_internal_review").eq("id", ctx.clientId).single()
+    expect(c.data).toEqual({ industry: `Reserved domains ${RUN}`, contact_person: "E2E Contact", require_internal_review: false })
   })
 
   test("the Super Admin creates a campaign for that client and edits it", async ({ page }) => {
     await signInOnce(page, ctx.adminEmail)
     await page.goto("/admin/campaigns")
     await page.getByRole("button", { name: "New campaign" }).click()
-    await page.locator("#name").fill(`E2E Workflow Campaign ${RUN}`)
     await page.locator("#client_id").selectOption(ctx.clientId)
+    await page.locator("#primary_keyword").fill(`e2e workflow keyword ${RUN}`)
     await page.locator("#target_url").fill(TARGET)
-    await page.locator("#status").selectOption("active")
     await page.getByRole("button", { name: "Create campaign" }).click()
     await expect(page).toHaveURL(/\/admin\/campaigns\/[0-9a-f-]{36}$/)
     ctx.campaignId = page.url().split("/").pop()!
@@ -275,7 +274,7 @@ test.describe.serial("agency workflow @writes", () => {
   // ---- 5. reports, filtering and exports -------------------------------------------------------
   test("the daily report filtered to the client shows its campaign and only its campaign", async ({ page }) => {
     await signInOnce(page, ctx.adminEmail)
-    await page.goto(`/admin/reports/daily?client=${ctx.clientId}`)
+    await page.goto(`/admin/reports?period=daily&client=${ctx.clientId}`)
     // Assert on the report table (the Campaign filter dropdown lists the code too, as a hidden <option>).
     const table = page.getByRole("table", { name: "Report by Campaign" })
     await expect(table.getByRole("cell", { name: ctx.campaignCode, exact: true })).toBeVisible()
@@ -285,7 +284,7 @@ test.describe.serial("agency workflow @writes", () => {
 
   test("report exports download as CSV, Excel and PDF with the filtered data", async ({ page }) => {
     await signInOnce(page, ctx.adminEmail)
-    await page.goto(`/admin/reports/daily?client=${ctx.clientId}`)
+    await page.goto(`/admin/reports?period=daily&client=${ctx.clientId}`)
     await page.getByRole("button", { name: "Export" }).click()
     const hrefs: Record<string, string> = {}
     for (const label of ["Excel (.xlsx)", "CSV", "PDF"]) hrefs[label] = (await page.getByRole("menuitem", { name: label }).getAttribute("href"))!

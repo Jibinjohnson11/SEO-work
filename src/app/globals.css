@@ -54,83 +54,83 @@
 }
 
 :root {
-  /* LinkOps palette */
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  /* LinkOps palette: Turquoise #447F98, Slate Blue #629BB5, Platinum #DADEE1 */
+  --background: #ffffff;
+  --foreground: #1e3a47;
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #1e3a47;
   --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
+  --popover-foreground: #1e3a47;
+  --primary: #447f98;
+  --primary-dark: #36677c;
   --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #0f172a;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #eff6ff;
-  --accent-foreground: #1d4ed8;
-  --destructive: #dc2626;
-  --success: #16a34a;
-  --warning: #f59e0b;
-  --info: #2563eb;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #2563eb;
-  --chart-1: #2a78d6;
-  --chart-2: #eb6834;
-  --chart-3: #1baf7a;
-  --chart-4: #eda100;
-  --chart-5: #e87ba4;
-  --chart-6: #6250d6;
+  --secondary: #dadee1;
+  --secondary-foreground: #1e3a47;
+  --muted: #e4e8eb;
+  --muted-foreground: #52666f;
+  --accent: #dfecf2;
+  --accent-foreground: #36677c;
+  --destructive: #c2453d;
+  --success: #3f8a6b;
+  --warning: #c98a2b;
+  --info: #629bb5;
+  --border: #d3d8dc;
+  --input: #cdd3d7;
+  --ring: #629bb5;
+  --chart-1: #447f98;
+  --chart-2: #629bb5;
+  --chart-3: #2b5567;
+  --chart-4: #9cc0d1;
+  --chart-5: #1a3542;
+  --chart-6: #b4bcc2;
   --radius: 0.625rem;
   --sidebar: #ffffff;
-  --sidebar-foreground: #0f172a;
-  --sidebar-primary: #2563eb;
+  --sidebar-foreground: #1e3a47;
+  --sidebar-primary: #447f98;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f1f5f9;
-  --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #2563eb;
+  --sidebar-accent: #eef0f2;
+  --sidebar-accent-foreground: #1e3a47;
+  --sidebar-border: #dadee1;
+  --sidebar-ring: #629bb5;
 }
 
 .dark {
-  --background: #0b1120;
-  --foreground: #e2e8f0;
-  --card: #111827;
-  --card-foreground: #e2e8f0;
-  --popover: #111827;
-  --popover-foreground: #e2e8f0;
-  --primary: #3b82f6;
-  --primary-dark: #2563eb;
-  --primary-foreground: #ffffff;
-  --secondary: #1e293b;
-  --secondary-foreground: #e2e8f0;
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  --accent: #172554;
-  --accent-foreground: #bfdbfe;
-  --destructive: #f87171;
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --info: #60a5fa;
-  --border: #1f2a3c;
-  --input: #273449;
-  --ring: #3b82f6;
-  --chart-1: #3987e5;
-  --chart-2: #d95926;
-  --chart-3: #199e70;
-  --chart-4: #c98500;
-  --chart-5: #d55181;
-  --chart-6: #9085e9;
-  --sidebar: #0f172a;
-  --sidebar-foreground: #e2e8f0;
-  --sidebar-primary: #3b82f6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1e293b;
-  --sidebar-accent-foreground: #e2e8f0;
-  --sidebar-border: #1f2a3c;
-  --sidebar-ring: #3b82f6;
+  --background: #0f1c22;
+  --foreground: #dadee1;
+  --card: #15262e;
+  --card-foreground: #dadee1;
+  --popover: #15262e;
+  --popover-foreground: #dadee1;
+  --primary: #629bb5;
+  --primary-dark: #447f98;
+  --primary-foreground: #0f1c22;
+  --secondary: #1f3540;
+  --secondary-foreground: #dadee1;
+  --muted: #1c303a;
+  --muted-foreground: #9fb3bd;
+  --accent: #24414f;
+  --accent-foreground: #dadee1;
+  --destructive: #e07a72;
+  --success: #6fbf9b;
+  --warning: #e0b260;
+  --info: #7fb2c9;
+  --border: #253b46;
+  --input: #2d4552;
+  --ring: #629bb5;
+  --chart-1: #629bb5;
+  --chart-2: #9cc0d1;
+  --chart-3: #447f98;
+  --chart-4: #dadee1;
+  --chart-5: #2f6177;
+  --chart-6: #7d8a92;
+  --sidebar: #12232b;
+  --sidebar-foreground: #dadee1;
+  --sidebar-primary: #629bb5;
+  --sidebar-primary-foreground: #0f1c22;
+  --sidebar-accent: #1f3540;
+  --sidebar-accent-foreground: #dadee1;
+  --sidebar-border: #253b46;
+  --sidebar-ring: #629bb5;
 }
 
 @layer base {
@@ -151,4 +151,17 @@
   .tabular {
     font-variant-numeric: tabular-nums;
   }
+}
+
+/*
+ * Card system (reference: the Brands page). Every panel, stat tile and list card uses these, so the
+ * radius, border, background and hover feel are defined once.
+ *   surface        12px-rounded card with a subtle border on the card background
+ *   surface-hover  hover for clickable cards: brighter border, soft shadow, 2px lift
+ */
+@utility surface {
+  @apply rounded-[12px] border bg-card text-card-foreground;
+}
+@utility surface-hover {
+  @apply transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md motion-reduce:transition-none motion-reduce:hover:translate-y-0;
 }

@@ -42,7 +42,7 @@ export default async function InternPerformanceSelf({ searchParams }: { searchPa
         <StatCard label="Rejected" value={m?.rejected ?? 0} tone={m?.rejected ? "danger" : "default"} />
         <StatCard label="Revision rate" value={`${m?.revision_rate ?? 0}%`} />
       </div>
-      <div className="rounded-xl border bg-card p-4"><div className="mb-2 text-sm font-medium">Target completion</div><ProgressBar value={m?.submitted ?? 0} max={m?.target ?? 0} /></div>
+      <div className="surface p-4"><div className="mb-2 text-sm font-medium">Target completion</div><ProgressBar value={m?.submitted ?? 0} max={m?.target ?? 0} /></div>
       <div className="grid gap-6 lg:grid-cols-2">
         <TimeSeriesChart title="Daily" data={series} series={[{ key: "submitted", label: "Submitted", slot: 1 }, { key: "client_approved", label: "Client approved", slot: 3 }, { key: "verified_live", label: "Verified live", slot: 6 }]} />
         <CategoryBarChart title="Weekly" layout="horizontal" categoryLabel="Week of" data={weekly} series={[{ key: "submitted", label: "Submitted", slot: 1 }, { key: "client_approved", label: "Client approved", slot: 3 }, { key: "verified_live", label: "Verified live", slot: 6 }]} />

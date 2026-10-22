@@ -10,7 +10,7 @@ import { formatDay } from "@/lib/format"
 import { getLookups, getSetting, resolvePeriod, type SearchParams } from "@/server/queries"
 import { internMetrics } from "@/server/intern-metrics"
 
-export const metadata = { title: "Intern Performance" }
+export const metadata = { title: "Team Performance" }
 
 export default async function InternPerformance({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams
@@ -31,16 +31,16 @@ export default async function InternPerformance({ searchParams }: { searchParams
   return (
     <>
       <PageHeader
-        title="Intern Performance"
+        title="Team Performance"
         description={`${range} · ${tz} · measured on approved and verified outcomes, not only volume`}
         actions={<span className="flex gap-2">{["xlsx", "csv", "pdf"].map((f) => <a key={f} href={`/api/analytics/interns?${query}&format=${f}`} className="inline-flex h-7 items-center gap-1 rounded-lg border px-2.5 text-[0.8rem] font-medium hover:bg-muted"><Download className="size-3.5" /> {f.toUpperCase()}</a>)}</span>}
       />
       <FilterBar defaultPeriod="this_month" filters={[{ type: "period" }]} />
-      <CategoryBarChart title="Intern comparison" layout="horizontal" categoryLabel="Intern" data={chart} series={[{ key: "target", label: "Assigned target", slot: "reference" }, { key: "submitted", label: "Submitted", slot: 1 }, { key: "client_approved", label: "Client approved", slot: 3 }, { key: "verified_live", label: "Verified live", slot: 6 }]} />
+      <CategoryBarChart title="Team comparison" layout="horizontal" categoryLabel="Team member" data={chart} series={[{ key: "target", label: "Assigned target", slot: "reference" }, { key: "submitted", label: "Submitted", slot: 1 }, { key: "client_approved", label: "Client approved", slot: 3 }, { key: "verified_live", label: "Verified live", slot: 6 }]} />
       <DataTable
-        searchPlaceholder="Search interns…"
+        searchPlaceholder="Search team members…"
         columns={[
-          { key: "name", header: "Intern", sortable: true },
+          { key: "name", header: "Team Member", sortable: true },
           { key: "tasks", header: "Tasks (done/assigned)", sortable: true, align: "right" },
           { key: "opp", header: "Opportunities", sortable: true, align: "right" },
           { key: "drafts", header: "Content drafts", sortable: true, align: "right" },
@@ -67,7 +67,7 @@ export default async function InternPerformance({ searchParams }: { searchParams
             },
           }
         })}
-        empty={{ title: "No interns" }}
+        empty={{ title: "No team members" }}
       />
     </>
   )

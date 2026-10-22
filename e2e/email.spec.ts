@@ -45,7 +45,7 @@ test.describe("outside recipients are refused before anything is sent @writes @e
     const email = blockedAddress("invite")
     await signIn(page, (await createActiveUser("super_admin", "admin-block")).email)
     await page.goto("/admin/interns")
-    await page.getByRole("button", { name: "Invite intern" }).click()
+    await page.getByRole("button", { name: "Add Team Member" }).click()
     await page.locator("#full_name").fill("E2E Blocked Invite")
     await page.locator("#email").fill(email)
     await page.getByRole("button", { name: "Send invitation" }).click()

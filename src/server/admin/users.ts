@@ -166,17 +166,6 @@ export async function inviteUser(input: InviteUserInput) {
   return result
 }
 
-export async function addExistingClientUser(clientId: string, email: string, perms: { can_approve: boolean; can_download_reports: boolean }) {
-  return run(async () => {
-    const { supabase } = await authorize(["super_admin"])
-    const { data: p } = await supabase.from("profiles").select("id, role").eq("email", z.email().parse(email.trim().toLowerCase())).maybeSingle()
-    if (!p) throw new Error("No user with that email. Invite them instead.")
-    if (p.role !== "client") throw new Error("Only client users can join a client workspace")
-    must(await supabase.from("client_members").insert({ client_id: id.parse(clientId), user_id: p.id, ...perms }))
-    revalidatePath(`/admin/clients/${clientId}`)
-  }, "User added to workspace")
-}
-
 export async function resendInvite(profileId: string) {
   const outcome = { recovered: false }
   const result = await run(async () => {
@@ -246,12 +235,6 @@ export async function updateIntern(internId: string, input: InternUpdateInput) {
           .upsert(campaign_ids.map((c) => ({ campaign_id: c, intern_id: internId, is_active: true, assigned_by: userId })), { onConflict: "campaign_id,intern_id" }),
       )
     revalidatePath(`/admin/interns/${internId}`)
-  }, "Intern updated")
+  }, "Team member updated")
 }
 
-export async function updateUserName(profileId: string, fullName: string) {
-  return run(async () => {
-    const { supabase } = await authorize(["super_admin"])
-    must(await supabase.from("profiles").update({ full_name: z.string().trim().min(1).max(120).parse(fullName) }).eq("id", id.parse(profileId)))
-  }, "User updated")
-}

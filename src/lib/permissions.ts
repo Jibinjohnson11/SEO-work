@@ -27,12 +27,17 @@ export const FEATURES = {
       description: "Submit new backlinks, edit drafts, upload files and record publication.",
       requires: "intern.submissions",
     },
+    {
+      key: "intern.content",
+      label: "Off-Page Content",
+      description: "Write content for their campaigns and resubmit it when the client requests changes.",
+    },
     { key: "intern.performance", label: "My Performance", description: "Their own performance metrics and target completion." },
     { key: "intern.notifications", label: "Notifications", description: "In-app notifications." },
   ],
   client: [
     { key: "portal.overview", label: "Overview", description: "Workspace summary with campaign progress and pending approvals." },
-    { key: "portal.approvals", label: "Approvals", description: "View content waiting for their approval." },
+    { key: "portal.approvals", label: "Content Approvals", description: "Read content and placements waiting for their review." },
     {
       key: "portal.approvals.decide",
       label: "Approve or reject content",
@@ -56,7 +61,7 @@ export type Feature = (typeof FEATURES)[AssignableRole][number]["key"]
 
 export const ALL_FEATURES: Feature[] = [...FEATURES.intern, ...FEATURES.client].map((f) => f.key)
 
-export const ROLE_LABELS: Record<AppRole, string> = { super_admin: "Super Admin", intern: "Intern", client: "Client" }
+export const ROLE_LABELS: Record<AppRole, string> = { super_admin: "Super Admin", intern: "Team member", client: "Client" }
 
 /**
  * Effective permissions of a user: ["*"] for a Super Admin, otherwise the feature keys they may

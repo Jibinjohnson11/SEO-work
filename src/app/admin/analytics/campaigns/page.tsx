@@ -46,7 +46,7 @@ export default async function CampaignAnalytics({ searchParams }: { searchParams
         defaultPeriod="this_month"
         filters={[
           { type: "period" },
-          { type: "select", key: "client", label: "Client", options: lookups.clients.map((c) => ({ value: c.id, label: c.company_name })) },
+          { type: "select", key: "client", label: "Brand", options: lookups.clients.map((c) => ({ value: c.id, label: c.company_name })) },
           { type: "select", key: "campaign", label: "Campaign", options: lookups.campaigns.filter((c) => !client || c.client_id === client).map((c) => ({ value: c.id, label: `${c.code} · ${c.name}` })) },
         ]}
       />

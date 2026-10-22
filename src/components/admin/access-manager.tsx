@@ -192,14 +192,14 @@ function ApproveForm({
               setFeatures([])
             }}
           >
-            <option value="intern">Intern</option>
+            <option value="intern">Team member</option>
             <option value="client">Client</option>
           </NativeSelect>
         </Field>
         {role === "client" ? (
-          <Field label="Client workspace" required htmlFor="approve-client">
+          <Field label="Brand workspace" required htmlFor="approve-client">
             <NativeSelect id="approve-client" value={clientId} onChange={(e) => setClientId(e.target.value)}>
-              <option value="">Choose a client…</option>
+              <option value="">Choose a brand…</option>
               {clients.map((c) => (
                 <option key={c.value} value={c.value}>
                   {c.label}
@@ -215,7 +215,7 @@ function ApproveForm({
           <SwitchField label="Workspace: can download reports" checked={canDownload} onCheckedChange={setCanDownload} />
         </div>
       ) : (
-        <Field label="Assign to campaigns" hint="Optional — can be changed later from Interns.">
+        <Field label="Assign to campaigns" hint="Optional — can be changed later from Team.">
           <CheckboxGroup options={campaigns} value={campaignIds} onChange={setCampaignIds} searchable emptyText="No campaigns yet." />
         </Field>
       )}

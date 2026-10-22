@@ -1,19 +1,7 @@
 import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import {
-  buildReport,
-  DIMENSION_LABEL,
-  METRIC_LABEL,
-  pivot,
-  utcRange,
-  type Dimension,
-  type ReportEvent,
-  type SubmissionSnapshot,
-  type TaskTarget,
-} from "@/lib/reporting"
-import type { ExportDoc } from "@/lib/export"
-import { formatDay } from "@/lib/format"
-import { fetchAll, getLookups, labelMaps, param, resolvePeriod, type Lookups, type SearchParams } from "@/server/queries"
+import { utcRange, type ReportEvent, type SubmissionSnapshot, type TaskTarget } from "@/lib/reporting"
+import { fetchAll, param, type SearchParams } from "@/server/queries"
 
 export interface ReportFilters {
   client: string
@@ -22,8 +10,6 @@ export interface ReportFilters {
   type: string
   keyword: string
 }
-
-export const GROUP_OPTIONS: Exclude<Dimension, never>[] = ["campaign", "intern", "client", "backlink_type", "keyword", "date"]
 
 export function readFilters(sp: SearchParams): ReportFilters {
   const uuid = (v: string) => (/^[0-9a-f-]{36}$/.test(v) ? v : "")
@@ -74,69 +60,4 @@ export async function loadReportData(
     ),
   ])
   return { events, tasks, submissions }
-}
-
-export async function reportContext(supabase: SupabaseClient, sp: SearchParams, defaults: { period: "today" | "this_week" | "this_month"; reportTz: string }) {
-  const lookups = await getLookups(supabase)
-  const filters = readFilters(sp)
-  const client = lookups.clients.find((c) => c.id === filters.client)
-  // A single-client report uses that client's time zone; otherwise the reporting time zone.
-  const timeZone = client?.timezone ?? defaults.reportTz
-  const period = resolvePeriod(sp, timeZone, defaults.period)
-  const groupBy = (GROUP_OPTIONS as string[]).includes(param(sp, "group")) ? (param(sp, "group") as Dimension) : "campaign"
-  const data = await loadReportData(supabase, { from: period.from, to: period.to, timeZone, filters })
-  const labels = labelMaps(lookups)
-  const report = buildReport({ ...data, from: period.from, to: period.to, timeZone, groupBy: [groupBy], labels })
-  const matrix = pivot({
-    events: data.events,
-    metric: "submitted",
-    rowDim: "campaign",
-    colDim: "backlink_type",
-    from: period.from,
-    to: period.to,
-    timeZone,
-    labels,
-    includeRows: lookups.campaigns
-      .filter((c) => c.status === "active" && (!filters.client || c.client_id === filters.client) && (!filters.campaign || c.id === filters.campaign))
-      .map((c) => c.id),
-  })
-  return { lookups, filters, timeZone, period, groupBy, data, labels, report, matrix }
-}
-
-export const REPORT_COLUMNS = ["target", "submitted", "internally_approved", "client_approved", "published", "verified_live", "rejected", "pending"] as const
-
-export function reportToExport(
-  ctx: Pick<Awaited<ReturnType<typeof reportContext>>, "report" | "matrix" | "groupBy" | "period" | "timeZone">,
-  title: string,
-  lookups?: Lookups,
-  filterNote?: string,
-): ExportDoc {
-  const { report, matrix, groupBy, period, timeZone } = ctx
-  void lookups
-  const range = period.from === period.to ? formatDay(period.from) : `${formatDay(period.from)} – ${formatDay(period.to)}`
-  return {
-    title,
-    subtitle: `${range} · time zone ${timeZone}${filterNote ? ` · ${filterNote}` : ""} · counts are first-occurrence events (no double counting)`,
-    sheets: [
-      {
-        name: `By ${DIMENSION_LABEL[groupBy]}`,
-        columns: [
-          { key: "dim", header: DIMENSION_LABEL[groupBy] },
-          ...REPORT_COLUMNS.map((m) => ({ key: m, header: METRIC_LABEL[m], numeric: true })),
-        ],
-        rows: report.rows.map((r) => ({ dim: r.dims[groupBy]?.label ?? "", ...Object.fromEntries(REPORT_COLUMNS.map((m) => [m, r[m]])) })),
-        footer: { dim: "Total", ...Object.fromEntries(REPORT_COLUMNS.map((m) => [m, report.totals[m]])) },
-      },
-      {
-        name: "Submitted by type",
-        columns: [
-          { key: "campaign", header: "Campaign" },
-          ...matrix.columns.map((c) => ({ key: c.id, header: c.label, numeric: true })),
-          { key: "total", header: "Total Submitted", numeric: true },
-        ],
-        rows: matrix.rows.map((r) => ({ campaign: r.label, ...r.cells, total: r.total })),
-        footer: { campaign: "Total", ...matrix.columnTotals, total: matrix.total },
-      },
-    ],
-  }
 }

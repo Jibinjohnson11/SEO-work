@@ -23,8 +23,8 @@ export async function GET(request: NextRequest) {
         {
           name: "Submissions",
           columns: [
-            { key: "code", header: "Submission ID" }, { key: "client", header: "Client" }, { key: "campaign", header: "Campaign" }, { key: "keyword", header: "Keyword" },
-            { key: "intern", header: "Intern" }, { key: "type", header: "Backlink Type" }, { key: "website", header: "Proposed Website" }, { key: "placement", header: "Placement URL" },
+            { key: "code", header: "Submission ID" }, { key: "client", header: "Brand" }, { key: "campaign", header: "Campaign" }, { key: "keyword", header: "Keyword" },
+            { key: "intern", header: "Team Member" }, { key: "type", header: "Backlink Type" }, { key: "website", header: "Proposed Website" }, { key: "placement", header: "Placement URL" },
             { key: "target", header: "Target URL" }, { key: "anchor", header: "Anchor Text" }, { key: "title", header: "Content Title" }, { key: "status", header: "Status" },
             { key: "version", header: "Version", numeric: true }, { key: "submitted", header: "First Submitted (UTC)" }, { key: "updated", header: "Updated (UTC)" },
           ],

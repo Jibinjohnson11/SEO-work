@@ -12,7 +12,7 @@ import type { CampaignStatus, LiveStatus, Priority, SubmissionStatus, TaskStatus
 
 const TONE_CLASS: Record<Tone, string> = {
   neutral: "bg-secondary text-secondary-foreground ring-border",
-  info: "bg-blue-50 text-blue-700 ring-blue-600/15 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-400/20",
+  info: "bg-accent text-accent-foreground ring-primary/20",
   warning: "bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20",
   success: "bg-green-50 text-green-700 ring-green-600/20 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-400/20",
   danger: "bg-red-50 text-red-700 ring-red-600/15 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/20",
@@ -20,12 +20,12 @@ const TONE_CLASS: Record<Tone, string> = {
 }
 
 const DOT_CLASS: Record<Tone, string> = {
-  neutral: "bg-slate-400",
-  info: "bg-blue-500",
+  neutral: "bg-muted-foreground/60",
+  info: "bg-primary",
   warning: "bg-amber-500",
   success: "bg-green-600",
   danger: "bg-red-600",
-  muted: "bg-slate-300 dark:bg-slate-600",
+  muted: "bg-border",
 }
 
 export function ToneBadge({ tone, children, className }: { tone: Tone; children: React.ReactNode; className?: string }) {
@@ -53,9 +53,13 @@ export function TaskStatusBadge({ status }: { status: TaskStatus }) {
   return <ToneBadge tone={s.tone}>{s.label}</ToneBadge>
 }
 
-export function CampaignStatusBadge({ status }: { status: CampaignStatus }) {
+export function CampaignStatusBadge({ status, className }: { status: CampaignStatus; className?: string }) {
   const s = CAMPAIGN_STATUS[status]
-  return <ToneBadge tone={s.tone}>{s.label}</ToneBadge>
+  return (
+    <ToneBadge tone={s.tone} className={className}>
+      {s.label}
+    </ToneBadge>
+  )
 }
 
 export function LiveStatusBadge({ status }: { status: LiveStatus }) {

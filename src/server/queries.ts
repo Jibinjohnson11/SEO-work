@@ -7,9 +7,8 @@ import type { SettingsKey } from "@/lib/validation"
 
 export const SETTINGS_DEFAULTS = {
   general: { platform_name: "LinkOps", logo_url: "", default_timezone: "Asia/Kolkata", date_format: "dd MMM yyyy", theme: "system" },
-  campaign_defaults: { daily_target: 5, weekly_target: 25, monthly_target: 100, priority: "medium" },
+  campaign_defaults: { daily_target: 5, weekly_target: 25, monthly_target: 100, priority: "medium", working_days_per_week: 5 },
   approval: {
-    internal_review_required: true,
     client_approval_required: true,
     reapproval_on_material_change: true,
     allow_admin_override: false,
@@ -88,22 +87,26 @@ export function resolvePeriod(sp: SearchParams, timeZone: string, fallback: Peri
 }
 
 /** Option lists for filters and forms (Super Admin context; RLS still applies). */
-export async function getLookups(supabase: SupabaseClient) {
+/**
+ * Every brand, campaign, team member, backlink type and keyword the user may read, for labels and
+ * filters. Paged past the API's 1,000-row limit, and a failed read throws (the error page shows) instead
+ * of silently returning empty lists.
+ */
+export const getLookups = cache(async (supabase: SupabaseClient) => {
   const [clients, campaigns, interns, types, keywords] = await Promise.all([
-    supabase.from("clients").select("id, code, company_name, status, timezone").order("company_name"),
-    supabase.from("campaigns").select("id, code, name, client_id, status").order("code"),
-    supabase.from("profiles").select("id, full_name, email, status").eq("role", "intern").order("full_name"),
-    supabase.from("backlink_types").select("id, name, is_active, sort_order").order("sort_order"),
-    supabase.from("keywords").select("id, keyword, client_id, status").order("keyword"),
+    fetchAll<{ id: string; code: string; company_name: string; status: string; timezone: string }>((a, b) =>
+      supabase.from("clients").select("id, code, company_name, status, timezone").order("company_name").order("id").range(a, b)),
+    fetchAll<{ id: string; code: string; name: string; client_id: string; status: string }>((a, b) =>
+      supabase.from("campaigns").select("id, code, name, client_id, status").order("code").range(a, b)),
+    fetchAll<{ id: string; full_name: string; email: string; status: string }>((a, b) =>
+      supabase.from("profiles").select("id, full_name, email, status").eq("role", "intern").order("full_name").order("id").range(a, b)),
+    fetchAll<{ id: string; name: string; is_active: boolean; sort_order: number }>((a, b) =>
+      supabase.from("backlink_types").select("id, name, is_active, sort_order").order("sort_order").order("id").range(a, b)),
+    fetchAll<{ id: string; keyword: string; client_id: string; status: string }>((a, b) =>
+      supabase.from("keywords").select("id, keyword, client_id, status").order("keyword").order("id").range(a, b)),
   ])
-  return {
-    clients: (clients.data ?? []) as { id: string; code: string; company_name: string; status: string; timezone: string }[],
-    campaigns: (campaigns.data ?? []) as { id: string; code: string; name: string; client_id: string; status: string }[],
-    interns: (interns.data ?? []) as { id: string; full_name: string; email: string; status: string }[],
-    types: (types.data ?? []) as { id: string; name: string; is_active: boolean; sort_order: number }[],
-    keywords: (keywords.data ?? []) as { id: string; keyword: string; client_id: string; status: string }[],
-  }
-}
+  return { clients, campaigns, interns, types, keywords }
+})
 export type Lookups = Awaited<ReturnType<typeof getLookups>>
 
 export function labelMaps(l: Lookups) {

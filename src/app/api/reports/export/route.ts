@@ -2,9 +2,9 @@ import { NextResponse, type NextRequest } from "next/server"
 import { authorize } from "@/lib/auth"
 import { EXPORT_TYPES, renderExport, type ExportFormat } from "@/lib/export"
 import { getSetting } from "@/server/queries"
-import { reportContext, reportToExport } from "@/server/report-data"
+import { REPORT_PERIODS, unifiedReport, unifiedToExport } from "@/server/unified-report"
 
-// Live report export for the Super Admin (Excel / CSV / PDF) using the same filters as the page.
+// Live export of the Reports page (Excel / CSV / PDF) with exactly the same period and filters.
 export async function GET(request: NextRequest) {
   let session
   try {
@@ -15,15 +15,10 @@ export async function GET(request: NextRequest) {
   const sp = Object.fromEntries(request.nextUrl.searchParams)
   const format = (sp.format ?? "xlsx") as ExportFormat
   if (!(format in EXPORT_TYPES)) return NextResponse.json({ error: "Unsupported format" }, { status: 400 })
-  const kind = ["daily", "weekly", "monthly"].includes(sp.kind) ? sp.kind : "daily"
-  const reports = await getSetting("reports")
-  const ctx = await reportContext(session.supabase, sp, {
-    period: kind === "weekly" ? "this_week" : kind === "monthly" ? "this_month" : "today",
-    reportTz: reports.timezone,
-  })
-  const title = `${kind[0].toUpperCase()}${kind.slice(1)} backlink report`
-  const body = await renderExport(reportToExport(ctx, title), format)
-  const filename = `linkops-${kind}-${ctx.period.from}${ctx.period.to !== ctx.period.from ? `_${ctx.period.to}` : ""}.${format}`
+  const { timezone } = await getSetting("reports")
+  const ctx = await unifiedReport(session.supabase, sp, timezone)
+  const body = await renderExport(unifiedToExport(ctx, `${REPORT_PERIODS[ctx.range.period]} backlink report`), format)
+  const filename = `linkops-${ctx.range.period}-${ctx.range.from}${ctx.range.to !== ctx.range.from ? `_${ctx.range.to}` : ""}.${format}`
   return new NextResponse(new Uint8Array(body), {
     headers: {
       "Content-Type": EXPORT_TYPES[format],

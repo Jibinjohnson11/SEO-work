@@ -6,7 +6,7 @@ import { StatCard } from "@/components/shared/stat-card"
 import { getLookups, getPresets, getSetting, type SearchParams } from "@/server/queries"
 import { querySubmissions, SUBMISSION_COLUMNS, submissionFilters, submissionRows } from "@/server/submission-list"
 
-export const metadata = { title: "Internal Review" }
+export const metadata = { title: "Medical Review" }
 
 export default async function ReviewQueue({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams
@@ -18,14 +18,14 @@ export default async function ReviewQueue({ searchParams }: { searchParams: Prom
   const count = (s: string) => subs.filter((x) => x.status === s).length
   return (
     <>
-      <PageHeader title="Internal Review" description="Quality-check submissions before anything reaches a client. Oldest first." />
-      <div className="grid grid-cols-3 gap-3">
+      <PageHeader title="Medical Review" description="Internal review applies to medical brands and campaigns only: confirm the medical checklist before anything reaches the client. Oldest first." />
+      <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="New submissions" value={count("submitted")} tone={count("submitted") ? "warning" : "default"} />
         <StatCard label="In review" value={count("internal_review")} />
         <StatCard label="Approved, not yet sent to client" value={count("internally_approved")} />
       </div>
       <FilterBar filters={submissionFilters(lookups, { statuses: [...statuses] })} presets={presets} />
-      <DataTable searchPlaceholder={false} columns={SUBMISSION_COLUMNS} rows={submissionRows(subsOldestFirst, lookups, reports.timezone)} empty={{ title: "Review queue is empty", description: "Nothing is waiting for internal review." }} />
+      <DataTable cards={{ title: "code", badge: "status" }} searchPlaceholder={false} columns={SUBMISSION_COLUMNS} rows={submissionRows(subsOldestFirst, lookups, reports.timezone)} empty={{ title: "Review queue is empty", description: "Nothing is waiting for medical review." }} />
     </>
   )
 }

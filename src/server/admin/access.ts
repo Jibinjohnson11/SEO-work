@@ -69,7 +69,7 @@ export async function updateUserAccess(userId: string, input: UserAccessInput) {
     const { supabase } = await authorize(["super_admin"])
     const p = must(await supabase.from("profiles").select("role").eq("id", id.parse(userId)).single())
     const role = assignableRole.safeParse(p.role)
-    if (!role.success) throw new Error("Feature access can be set for approved intern and client accounts only")
+    if (!role.success) throw new Error("Feature access can be set for approved team member and client accounts only")
     const permissions = data.use_role_defaults ? null : sanitizeFeatures(role.data, data.features)
     must(await supabase.from("profiles").update({ permissions }).eq("id", userId))
     revalidateAccess()

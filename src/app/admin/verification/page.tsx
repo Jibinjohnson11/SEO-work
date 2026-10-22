@@ -48,11 +48,11 @@ export default async function VerificationPage({ searchParams }: { searchParams:
         filters={[
           { type: "search", key: "q", label: "Search", placeholder: "URL, domain, SUB code" },
           { type: "select", key: "live", label: "Live status", allLabel: "Needs attention", options: (Object.keys(LIVE_STATUS) as LiveStatus[]).map((s) => ({ value: s, label: LIVE_STATUS[s].label })) },
-          { type: "select", key: "client", label: "Client", options: lookups.clients.map((c) => ({ value: c.id, label: c.company_name })) },
+          { type: "select", key: "client", label: "Brand", options: lookups.clients.map((c) => ({ value: c.id, label: c.company_name })) },
           { type: "select", key: "campaign", label: "Campaign", options: lookups.campaigns.map((c) => ({ value: c.id, label: `${c.code} · ${c.name}` })) },
         ]}
       />
-      <DataTable
+      <DataTable cards={{ title: "url", badge: "status", actions: "actions" }}
         searchPlaceholder={false}
         bulk={<VerifyBulk />}
         columns={[
@@ -65,6 +65,7 @@ export default async function VerificationPage({ searchParams }: { searchParams:
         ]}
         rows={rows.map((p) => ({
           id: p.id,
+          href: `/admin/submissions/${p.submission_id}`,
           sort: { url: p.publisher_domain, submission: p.backlink_submissions.code, checked: p.last_checked_at, status: p.live_status },
           cells: {
             url: <a href={p.published_url} target="_blank" rel="noreferrer noopener nofollow" className="block max-w-72 truncate text-primary hover:underline">{p.published_url}</a>,
