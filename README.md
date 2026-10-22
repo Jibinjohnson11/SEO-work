@@ -2,12 +2,12 @@
 
 LinkOps lets an agency run backlink campaigns end to end:
 
-- The **Super Admin** configures clients, campaigns, keywords, interns, tasks, backlink types and every workflow setting.
-- **Interns** submit opportunities and content for the campaigns they're assigned to.
-- **Clients** approve content in their own portal.
+- The **Super Admin** configures brands (clients), campaigns and their keywords, team members, tasks, backlink types and every workflow setting.
+- **Team members** (the `intern` role) write Off-Page Content and submit backlink opportunities for the campaigns they're assigned to.
+- **Clients** approve content and placements in their own portal.
 - The platform tracks publication and checks that links are live, then produces timestamp-accurate reports.
 
-Stack: Next.js 16 (App Router, TypeScript), Tailwind CSS 4, shadcn/ui (Base UI), Supabase (Postgres, Auth, Storage, Row Level Security), Zod, React Hook Form, TanStack Table, Recharts, Motion. Exports use ExcelJS, PapaParse and jsPDF. Scheduled jobs run on Vercel Cron.
+Stack: Next.js 16 (App Router, TypeScript), Tailwind CSS 4, shadcn/ui (Base UI), Supabase (Postgres, Auth, Storage, Row Level Security), Zod, React Hook Form, TanStack Table, Recharts, Motion. Exports use ExcelJS, PapaParse and jsPDF. Hosted on Render (`render.yaml`: web service plus a daily cron job).
 
 ---
 
@@ -28,7 +28,7 @@ Stack: Next.js 16 (App Router, TypeScript), Tailwind CSS 4, shadcn/ui (Base UI),
 The migrations create every table, RLS policy, workflow function, the private `submission-files` storage bucket, and the default configuration (backlink types and settings). They create **no** clients, campaigns or submissions.
 
 ### 1.2 Environment variables
-Copy `.env.example` to `.env.local` locally, and set the same variables in Vercel:
+Copy `.env.example` to `.env.local` locally, and set the same variables on the Render web service:
 
 | Variable | Required | Purpose |
 |---|---|---|
@@ -38,6 +38,7 @@ Copy `.env.example` to `.env.local` locally, and set the same variables in Verce
 | `NEXT_PUBLIC_APP_URL` | yes | Public URL, used in invitation and reset links |
 | `CRON_SECRET` | yes | Protects `/api/cron/daily` |
 | `RESEND_API_KEY`, `EMAIL_FROM` | optional | Email digests and scheduled report emails |
+| `CLIENT_IP_HEADER`, `TRUSTED_PROXY_HOPS` | recommended | The header Render's proxy controls, for IP-based sign-in limits (off until set; per-email limits always apply) |
 
 If something required is missing, the app doesn't pretend to work:
 - Missing Supabase settings: every page redirects to `/setup`, which lists the missing variables.
@@ -61,22 +62,24 @@ npm run dev            # http://localhost:3000
 npm run check          # typecheck + lint + all tests
 ```
 
-### 1.5 Deploy to Vercel
-1. Import the repository into Vercel and set the environment variables above.
-2. `vercel.json` schedules `GET /api/cron/daily` at 00:30 UTC every day. Vercel sends `Authorization: Bearer $CRON_SECRET` automatically when `CRON_SECRET` is set.
-3. The cron route sets `maxDuration = 300` seconds. On plans with a lower limit, reduce **Settings → Verification → Max checks per run**.
-4. The cron route responds `500` when any step failed (the JSON body lists the errors), so the platform's cron monitoring flags failed runs. Failed report emails are retried on the next runs (up to 3 attempts).
+### 1.5 Deploy (Render)
+Full steps, staging and rollback: [`docs/staging-and-deployment.md`](docs/staging-and-deployment.md).
+1. **Database first.** Apply new migrations to staging, verify, then production, **before** the code that needs them is deployed. Render deploys `main` on its own, so merge only after the migrations are in place. Take a backup before each migration; rollbacks are in `supabase/rollbacks/` and run newest first.
+2. `render.yaml` defines the web service (deploys `main` only after GitHub CI passes; confirm this setting in the Render dashboard, since a Blueprint is not re-applied automatically) and the `linkops-daily` cron job, which calls `GET /api/cron/daily` at 00:30 UTC with `CRON_SECRET`.
+3. The cron route sets `maxDuration = 300` seconds. If runs time out, reduce **Settings → Verification → Max checks per run**.
+4. The cron route responds `500` when any step failed (the JSON body lists the errors), so Render marks the run failed. Failed report emails are retried on the next runs (up to 3 attempts).
 5. Point an uptime monitor at `GET /api/health` (200 = app configured and Supabase reachable, 503 otherwise).
-6. GitHub Actions (`.github/workflows/ci.yml`) runs typecheck, lint, tests and a build on every pull request and push. It never deploys; the hosting platform builds and deploys from the repository.
+6. GitHub Actions (`.github/workflows/ci.yml`) runs typecheck, lint, tests and a build on every pull request and push. It never deploys.
 
 ---
 
 ## 2. Roles and security model
 
-| | Super Admin | Intern | Client |
+| | Super Admin | Team member (`intern`) | Client |
 |---|---|---|---|
-| Clients, campaigns, keywords, tasks, types, settings | full control | read assigned campaigns only | – |
-| Submissions | read all; review, forward, override (if enabled), reassign, archive, edit | create/edit **own** drafts and returned work; publish own approved work | approve / reject / request changes for **own workspace**, version-pinned |
+| Brands, campaigns, keywords, tasks, types, settings | full control | read assigned campaigns only | – |
+| Off-Page Content | read all; write and resubmit; override the client (if enabled) | write and resubmit **own** content for assigned campaigns | approve / reject / request edits for **own brands**, version-pinned |
+| Submissions | read all; medical review, forward, override (if enabled), reassign, archive, edit | create/edit **own** drafts and returned work; publish own approved work | approve / reject / request changes for **own workspace**, version-pinned |
 | Reports | all, plus snapshots and publishing | own performance | published snapshots for own workspace (download if permitted) |
 
 Security is enforced in the database, not just by hiding UI:
@@ -101,7 +104,7 @@ Security is enforced in the database, not just by hiding UI:
 
 1. **Sign-up.** Anyone can create an account at `/signup`. After confirming their email they can sign in, but their profile is `pending` with **no role**. They see only an "awaiting administrator approval" page. `auth_role()` is null for them, so every RLS policy and RPC denies them data.
 2. **Approval.** In **Administration → Users & Access** the Super Admin approves or rejects each registration. Approving assigns a role (Intern or Client, plus a workspace or campaigns) and the features the account may use. This runs in one transaction (`approve_registration()`). Super Admin can never be granted from the app. A role is assigned once and can't be changed afterwards.
-3. **Features.** Each role has a catalog of features (`src/lib/permissions.ts`), for example *My Tasks*, *Create & edit submissions*, *Approve or reject content* and *Download reports*. A user either follows the **role defaults** (editable on the same page) or has an **explicit list**. Changes apply on the user's next request. Removing every feature revokes access without disabling the account. Existing and invited users follow the role defaults, which start with every feature, so nothing changes for them.
+3. **Features.** Each role has a catalog of features (`src/lib/permissions.ts`), for example *My Tasks*, *Create & edit submissions*, *Approve or reject content* and *Download reports*. A user either follows the **role defaults** (editable on the same page) or has an **explicit list**. Changes apply on the user's next request. Removing every feature revokes access without disabling the account. Existing and invited users follow the role defaults, which start with every feature, so nothing changes for them. A feature added later (for example *Off-Page Content*, `intern.content`, from migration 19) is added to the **role defaults only**: users with an explicit list don't get it until it is ticked for them in Users & Access.
 4. **Enforcement.** The checks run in four places:
    - **Database:** `my_permissions()` / `has_permission()`. The RPCs behind each feature check it: submission save/files/publication, task status, client decisions, the `client_portal_*` reads and the client reports policy.
    - **Pages:** every page calls `requireRole(roles, feature)` and redirects to the user's first permitted page.
@@ -115,18 +118,27 @@ Security is enforced in the database, not just by hiding UI:
 ## 3. Workflow
 
 ```
-Draft → Submitted → Internal Review ─┬─ Internal Changes Requested → (intern revises → new version) → Submitted
-                                     ├─ Internally Rejected (can be reassigned)
-                                     └─ Internally Approved → Awaiting Client Approval ─┬─ Client Changes Requested → revise → Submitted
-                                                                                        ├─ Client Rejected (can be reassigned)
-                                                                                        └─ Client Approved → Ready for Publication
-                                     → Published → Verification Pending → Verified Live / Verification Failed   (+ Archived)
+Off-Page Content:  Pending Review ─┬─ Needs Edit → (author revises → new version) → Pending Review
+                                   ├─ Rejected (final)
+                                   └─ Approved (final) ──► can be linked to one backlink submission
+
+Backlink submission:
+Draft → Submitted ─┬─ (medical only) Internal Review ─┬─ Internal Changes Requested → revise → Submitted
+                   │                                  ├─ Internally Rejected (can be reassigned)
+                   │                                  └─ Internally Approved ─┐
+                   └──────────────────────────────────────────────────────────┴─► Awaiting Client Approval ─┬─ Client Changes Requested → revise → Submitted
+                                                                                                           ├─ Client Rejected (can be reassigned)
+                                                                                                           └─ Client Approved → Ready for Publication
+                   (linked to approved content, or brand without client approval) ──────────────────────────────────────────► Ready for Publication
+→ Published → Verification Pending → Verified Live / Verification Failed   (+ Archived)
 ```
 
-- **Per client and per campaign settings:** internal review and client approval can each be switched off. Skipped stages still record a "Submitted" event, so reports stay consistent.
+- **Client approval is the approval stage.** Internal review runs only for medical brands and campaigns while **Settings → Approvals → Medical review required** is on; the database enforces it (`campaign_flags()`), whatever the stored flags say. Client approval can be switched off per brand or campaign. Skipped stages still record a "Submitted" event, so reports stay consistent.
+- **Off-Page Content → publication.** A team member can link a backlink submission to one piece of their client-approved content from the same campaign. The client already approved that content, so the placement skips the second client approval (`submission_flags()`); medical campaigns still go through medical review. One content piece can back only one live submission.
+- **Campaign status.** Tasks and backlink submissions need an **active** campaign; Off-Page Content can also be prepared for a **draft** campaign.
 - **Versions.** Every submit snapshots the material content (website, placement, target, anchor, title, draft) as a new version, but only if it changed. A client decision records the exact version it applies to. If the content changes while the client is reviewing, their approval is rejected and they're shown the new version. If an admin materially edits approved content, it goes back to the client for re-approval when re-approval is enabled.
 - **Medical campaigns.** Internal approval is blocked until a person confirms medical accuracy, claims verified and sources checked, and enters the reviewer's name (qualification, compliance notes and date are also recorded). Nothing is filled in automatically.
-- **Admin override.** Off by default. When enabled, it requires a reason, is stored with `is_admin_override = true`, shows as "Agency override" everywhere (including to the client), notifies the client, and never counts as a client approval in reports.
+- **Admin override.** Off by default. When enabled (it covers backlink placements and Off-Page Content), it requires a reason, is stored with `is_admin_override = true`, shows as "Agency override" everywhere (including to the client), notifies the client, and never counts as a client approval in reports.
 - **Duplicates.** A placement (normalized published URL plus normalized target URL) can be recorded as published only once. `http`/`https`, `www.`, trailing slashes and fragments are treated as the same URL.
 
 ## 4. Reporting rules

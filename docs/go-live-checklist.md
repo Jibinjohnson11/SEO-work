@@ -59,12 +59,10 @@ Without this, confirmation, invitation and password-reset emails will not reliab
 
 ## 3. Choose the host
 
-Pick **one**:
+LinkOps runs on **Render** (`render.yaml`: the web service and the `linkops-daily` cron job). The Vercel and Cloudflare configurations were removed. Setup, staging and rollback: `docs/staging-and-deployment.md`.
 
-- **Vercel (recommended, simplest).** Use the **Pro** plan: Hobby doesn't allow commercial use. `vercel.json` already schedules the daily job.
-- **Cloudflare Workers.** Use the **Workers Paid** plan. Deploy with `npm run cf:deploy` and set secrets with `npx wrangler secret put <NAME>`. In `wrangler.jsonc`, consider raising `limits.cpu_ms`, because report generation is CPU-heavy.
-
-Once chosen, tell the developer so the other platform's config files can be removed.
+- In the Render dashboard, set the web service's auto-deploy to **after CI checks pass** (a Blueprint change is not applied to an existing service on its own).
+- Protect `main` on GitHub (pull request + passing CI), because Render deploys whatever lands there.
 
 ## 4. Environment variables (in the hosting dashboard)
 
@@ -98,8 +96,7 @@ Open the invitation email, press **Accept invitation**, set a password, and you 
 
 1. Add an uptime monitor (UptimeRobot, Better Stack, or your host's own) for `GET https://<your-domain>/api/health`. 200 means healthy, 503 means down.
 2. Turn on alerts for the daily job:
-   - **Vercel:** Settings → Cron Jobs shows each run. Add a log drain or alert on `[cron] completed with errors`.
-   - **Cloudflare:** Workers → your worker → Logs; alert on `[cron]` lines that don't end in `200`.
+   - **Render:** `linkops-daily` → enable failure notifications. A run fails (exit 1) whenever `/api/cron/daily` answers non-2xx; its log shows the JSON summary with the errors.
 3. Optional: error tracking such as Sentry. Server errors are logged as one JSON line with `"event":"request_error"`. To forward them, add the call in `src/instrumentation.ts`.
 4. **Test a restore once:** restore the latest backup into a spare Supabase project and confirm you can sign in there.
 
@@ -112,13 +109,14 @@ Do each step with real accounts and real email inboxes (one Gmail and one Outloo
 3. [ ] Self-register at `/signup` → the confirmation email arrives (inbox, not spam) → *Continue* → "awaiting approval" page.
 4. [ ] Try to sign in before confirming → **Resend confirmation email** works.
 5. [ ] Super Admin approves the registration with a role and features → the user sees only those features.
-6. [ ] Create a client, campaign, keyword and task. The intern submits work → review → client approval → publication → **Check now** verification.
-7. [ ] Edit and delete something (a draft task, a keyword not in use). Records with history can only be archived, which is expected.
-8. [ ] Password reset from `/forgot-password` → the email arrives → *Continue* → set a new password → sign in.
-9. [ ] Disable a user → they lose access immediately.
-10. [ ] Trigger the daily job once:
+6. [ ] Create a brand, an active campaign (with keywords) and a task. The team member writes Off-Page Content → the client approves it → the team member submits a backlink linked to that content (it goes straight to *Ready for Publication*) → publication → **Check now** verification.
+7. [ ] A medical brand: a submission goes to **Medical Review** first; approval needs the medical checklist.
+8. [ ] Edit and delete something (a draft task, a brand without campaigns). Records with history can only be archived, which is expected.
+9. [ ] Password reset from `/forgot-password` → the email arrives → *Continue* → set a new password → sign in.
+10. [ ] Disable a user → they lose access immediately.
+11. [ ] Trigger the daily job once:
     ```bash
     curl -H "Authorization: Bearer $CRON_SECRET" https://<staging-domain>/api/cron/daily
     ```
     Expect HTTP 200 and `"ok": true`.
-11. [ ] On a phone: sign in, open the menu, open a table and a form dialog.
+12. [ ] On a phone: sign in, open the menu, open a table and a form dialog.
