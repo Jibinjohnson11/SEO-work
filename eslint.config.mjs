@@ -7,8 +7,6 @@ const eslintConfig = defineConfig([
   ...nextTs,
   // Override default ignores of eslint-config-next.
   globalIgnores([
-    ".open-next/**",
-    ".wrangler/**",
     // Staging build (scripts/staging-env.mjs) and Playwright output.
     ".next-staging/**",
     "test-results/**",

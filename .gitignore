@@ -33,8 +33,6 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# vercel
-.vercel
 
 # typescript
 *.tsbuildinfo
@@ -42,10 +40,6 @@ next-env.d.ts
 
 !.env.example
 
-# OpenNext / Cloudflare build output
-/.open-next/
-/.wrangler/
-.dev.vars*
 
 # Supabase CLI local state (version cache, linked-project metadata)
 /supabase/.temp/

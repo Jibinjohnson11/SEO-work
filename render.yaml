@@ -37,7 +37,7 @@ services:
     runtime: node
     region: singapore
     plan: starter
-    schedule: "30 0 * * *" # 00:30 UTC daily, same as vercel.json / wrangler.jsonc
+    schedule: "30 0 * * *" # 00:30 UTC daily
     branch: main
     buildCommand: node --version # nothing to build: the job only calls the web app
     # Fails (non-zero exit) when the app reports a failed step (HTTP 500), so Render marks the run failed.

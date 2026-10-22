@@ -39,8 +39,6 @@
     ".next-staging/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    ".open-next",
-    ".wrangler"
+    "node_modules"
   ]
 }
