@@ -108,7 +108,9 @@ export async function removeSubmissionFile(fileId: string) {
   return run(async () => {
     const { supabase } = await authorize(["intern", "super_admin"], "intern.submissions.manage")
     const path = must(await supabase.rpc("submission_remove_file", { p_file_id: id.parse(fileId) })) as string
-    await supabase.storage.from("submission-files").remove([path])
+    // The record is gone, so the user sees success; a leftover object is logged for cleanup.
+    const removed = await supabase.storage.from("submission-files").remove([path])
+    if (removed.error) console.error("[removeSubmissionFile] storage object not removed; delete it manually", { path, error: removed.error.message })
     revalidateSubmission()
   }, "File removed")
 }

@@ -229,27 +229,46 @@ export async function importCampaigns(formData: FormData) {
           description: r.description || null,
         }
 
+        // A campaign's brand never changes: its keywords, tasks and submissions belong to that brand.
+        const existing = r.campaign_code
+          ? must(await supabase.from("campaigns").select("id, client_id").eq("code", r.campaign_code).maybeSingle())
+          : null
+        if (r.campaign_code && !existing) throw new Error(`campaign_code ${r.campaign_code} not found`)
+        if (existing && existing.client_id !== clientId)
+          throw new Error(`campaign_code ${r.campaign_code} belongs to another brand; a campaign's brand cannot be changed`)
+
+        // Keywords are resolved before anything is written, so a failing keyword leaves the campaign untouched.
+        const keywords = await resolveKeywords(supabase, clientId, r.primary_keyword ?? "", splitList(r.secondary_keywords), target || null)
+
         let campaignId: string
-        if (r.campaign_code) {
-          const existing = await supabase.from("campaigns").select("id").eq("code", r.campaign_code).maybeSingle()
-          if (!existing.data) throw new Error(`campaign_code ${r.campaign_code} not found`)
-          campaignId = existing.data.id
-          must(await supabase.from("campaigns").update(row).eq("id", campaignId))
+        if (existing) {
+          campaignId = existing.id
+          const { client_id: _client, ...editable } = row
+          void _client
+          must(await supabase.from("campaigns").update(editable).eq("id", campaignId))
           result.updated++
         } else {
           campaignId = must(await supabase.from("campaigns").insert({ ...row, created_by: userId }).select("id").single()).id
           result.created++
         }
 
-        const keywordNames = [r.primary_keyword, ...splitList(r.secondary_keywords)].filter(Boolean) as string[]
-        for (const [k, kwName] of keywordNames.entries()) {
-          const kw = await findOrCreateKeyword(supabase, clientId, kwName, target || null)
+        // Keywords are added (never removed). A new primary replaces the old one first: one primary per campaign.
+        if (keywords.primary_keyword_id)
           must(
             await supabase
               .from("campaign_keywords")
-              .upsert({ campaign_id: campaignId, keyword_id: kw.id, is_primary: k === 0 && Boolean(r.primary_keyword) }, { onConflict: "campaign_id,keyword_id" }),
+              .update({ is_primary: false })
+              .eq("campaign_id", campaignId)
+              .eq("is_primary", true)
+              .neq("keyword_id", keywords.primary_keyword_id),
           )
-        }
+        if (keywords.keyword_ids.length)
+          must(
+            await supabase.from("campaign_keywords").upsert(
+              keywords.keyword_ids.map((keyword_id) => ({ campaign_id: campaignId, keyword_id, is_primary: keyword_id === keywords.primary_keyword_id })),
+              { onConflict: "campaign_id,keyword_id" },
+            ),
+          )
       } catch (e) {
         result.errors.push({ row: rowNo, message: (e as { message?: string }).message ?? "Failed" })
       }

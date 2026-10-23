@@ -23,6 +23,7 @@ import {
 import { RICH_TEXT_CLASS, RichTextEditor } from "@/components/shared/rich-text-editor"
 import { useAction } from "@/hooks/use-action"
 import { CONTENT_TYPES, DECISION_LABEL, type ContentDecision, type ContentType, type ContentVersion, type OffpageContent } from "@/lib/offpage-content"
+import { sanitizeRichText } from "@/lib/rich-text"
 import { offpageContentSchema } from "@/lib/validation"
 import { submitOffpageContent } from "@/server/offpage-content"
 
@@ -252,7 +253,8 @@ export function ContentRowActions({
               <span className="font-medium">{DECISION_LABEL[latest.decision]} — {latest.decided_by_name}{latest.is_admin_override ? " (admin override)" : ""}:</span> <span className="whitespace-pre-wrap">{latest.feedback}</span>
             </div>
           ) : null}
-          <div className={`${RICH_TEXT_CLASS} max-h-[50vh] overflow-y-auto rounded-md border p-4`} dangerouslySetInnerHTML={{ __html: content.content_html }} />
+          {/* Sanitized again at render: offpage_content_submit can be called directly, skipping the server action's sanitizer. */}
+          <div className={`${RICH_TEXT_CLASS} max-h-[50vh] overflow-y-auto rounded-md border p-4`} dangerouslySetInnerHTML={{ __html: sanitizeRichText(content.content_html) }} />
           {versions.length > 1 || decisions.length ? (
             <details className="rounded-md border px-3 py-2 text-sm">
               <summary className="cursor-pointer font-medium">History ({versions.length} version{versions.length === 1 ? "" : "s"}, {decisions.length} decision{decisions.length === 1 ? "" : "s"})</summary>

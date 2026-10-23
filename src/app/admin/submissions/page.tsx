@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/shared/page-header"
 import { DataTable } from "@/components/shared/data-table"
 import { FilterBar } from "@/components/shared/filter-bar"
 import { getLookups, getPresets, getSetting, type SearchParams } from "@/server/queries"
-import { querySubmissions, SUBMISSION_COLUMNS, submissionFilters, submissionRows } from "@/server/submission-list"
+import { querySubmissions, SUBMISSION_COLUMNS, SUBMISSION_LIST_LIMIT, submissionFilters, submissionRows } from "@/server/submission-list"
 
 export const metadata = { title: "Backlink Submissions" }
 
@@ -12,7 +12,7 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
   const sp = await searchParams
   const { supabase } = await requireRole(["super_admin"])
   const [lookups, reports, presets] = await Promise.all([getLookups(supabase), getSetting("reports"), getPresets(supabase, "/admin/submissions")])
-  const subs = await querySubmissions(supabase, sp, { timeZone: reports.timezone, limit: 2000 })
+  const subs = await querySubmissions(supabase, sp, { timeZone: reports.timezone })
   const exportQuery = new URLSearchParams(Object.entries(sp).flatMap(([k, v]) => (typeof v === "string" ? [[k, v]] : []))).toString()
   return (
     <>
@@ -27,7 +27,7 @@ export default async function SubmissionsPage({ searchParams }: { searchParams: 
       />
       <FilterBar filters={submissionFilters(lookups)} presets={presets} />
       <DataTable cards={{ title: "code", badge: "status" }} searchPlaceholder="Filter these results…" columns={SUBMISSION_COLUMNS} rows={submissionRows(subs, lookups, reports.timezone)} empty={{ title: "No submissions", description: "Team members' submissions appear here as soon as they are submitted." }} />
-      {subs.length >= 2000 ? <p className="text-xs text-muted-foreground">Showing the 2,000 most recently updated. Narrow the filters to see older records.</p> : null}
+      {subs.length >= SUBMISSION_LIST_LIMIT ? <p className="text-xs text-muted-foreground">Showing the {SUBMISSION_LIST_LIMIT.toLocaleString("en")} most recently updated. Narrow the filters to see older records, or export them all.</p> : null}
     </>
   )
 }

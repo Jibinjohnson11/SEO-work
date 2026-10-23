@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { motion } from "motion/react"
-import { ChevronsLeft, ChevronsRight, Link2, Menu } from "lucide-react"
+import { ChevronsLeft, ChevronsRight, Menu } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -120,15 +120,25 @@ export function AppShell({
 function Brand({ name, logoUrl, collapsed, role }: { name: string; logoUrl?: string | null; collapsed: boolean; role: AppRole | null }) {
   return (
     <div className={cn("flex h-14 items-center gap-2 border-b px-3", collapsed && "justify-center px-0")}>
-      {logoUrl ? (
+      {!logoUrl ? (
+        // Built-in Nexora logo, used until a custom logo URL is set in Settings → General.
+        collapsed ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/brand/nexora-mark.png" alt={name} className="size-8 object-contain" />
+        ) : (
+          <div className="min-w-0 space-y-0.5 leading-tight">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/nexora-wordmark.png" alt={name} className="h-7 w-auto object-contain" />
+            <div className="text-[11px] text-muted-foreground">
+              {role === "super_admin" ? "Super Admin" : role === "intern" ? "Team workspace" : role === "client" ? "Client portal" : "Awaiting approval"}
+            </div>
+          </div>
+        )
+      ) : (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logoUrl} alt="" className="size-7 rounded-md object-contain" />
-      ) : (
-        <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <Link2 className="size-4" />
-        </div>
       )}
-      {collapsed ? null : (
+      {collapsed || !logoUrl ? null : (
         <div className="min-w-0 leading-tight">
           <div className="truncate text-sm font-semibold">{name}</div>
           <div className="text-[11px] text-muted-foreground">

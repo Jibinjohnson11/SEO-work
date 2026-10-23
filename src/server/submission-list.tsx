@@ -7,8 +7,11 @@ import { SubmissionStatusBadge, ToneBadge } from "@/components/shared/status-bad
 import { formatDateTime, timeAgo } from "@/lib/format"
 import { SUBMISSION_STATUS, SUBMISSION_STATUSES } from "@/lib/workflow"
 import { utcRange } from "@/lib/reporting"
-import { param, resolvePeriod, type Lookups, type SearchParams, labelMaps } from "@/server/queries"
+import { fetchAll, param, resolvePeriod, searchTerm, type Lookups, type SearchParams, labelMaps } from "@/server/queries"
 import type { Submission, SubmissionStatus } from "@/lib/types"
+
+/** Rows a submission list shows (the API's row cap); exports read every row. */
+export const SUBMISSION_LIST_LIMIT = 1000
 
 const uuidParam = (sp: SearchParams, k: string) => (/^[0-9a-f-]{36}$/.test(param(sp, k)) ? param(sp, k) : "")
 
@@ -16,9 +19,22 @@ const uuidParam = (sp: SearchParams, k: string) => (/^[0-9a-f-]{36}$/.test(param
 export async function querySubmissions(
   supabase: SupabaseClient,
   sp: SearchParams,
-  opts: { statuses?: SubmissionStatus[]; timeZone: string; limit?: number; dateField?: "updated_at" | "first_submitted_at" },
+  opts: { statuses?: SubmissionStatus[]; timeZone: string; dateField?: "updated_at" | "first_submitted_at"; all?: boolean },
 ) {
-  let q = supabase.from("backlink_submissions").select("*").order("updated_at", { ascending: false }).limit(opts.limit ?? 1000)
+  // `all` (exports) reads every row in pages; lists show the newest SUBMISSION_LIST_LIMIT.
+  if (opts.all) return fetchAll<Submission>((from, to) => submissionQuery(supabase, sp, opts).range(from, to))
+  const { data, error } = await submissionQuery(supabase, sp, opts).limit(SUBMISSION_LIST_LIMIT)
+  if (error) throw error
+  return (data ?? []) as Submission[]
+}
+
+function submissionQuery(
+  supabase: SupabaseClient,
+  sp: SearchParams,
+  opts: { statuses?: SubmissionStatus[]; timeZone: string; dateField?: "updated_at" | "first_submitted_at" },
+) {
+  // id breaks ties so pages never skip or repeat rows.
+  let q = supabase.from("backlink_submissions").select("*").order("updated_at", { ascending: false }).order("id")
   const status = param(sp, "status")
   if (opts.statuses) q = q.in("status", status && opts.statuses.includes(status as SubmissionStatus) ? [status] : opts.statuses)
   else if (SUBMISSION_STATUSES.includes(status as SubmissionStatus)) q = q.eq("status", status)
@@ -33,11 +49,9 @@ export async function querySubmissions(
     const col = opts.dateField ?? "first_submitted_at"
     q = q.gte(col, r.start.toISOString()).lt(col, r.end.toISOString())
   }
-  const qtext = param(sp, "q").trim().replace(/[%_,()*\\]/g, " ")
+  const qtext = searchTerm(param(sp, "q"))
   if (qtext) q = q.or(`code.ilike.%${qtext}%,proposed_website.ilike.%${qtext}%,content_title.ilike.%${qtext}%,anchor_text.ilike.%${qtext}%,placement_url.ilike.%${qtext}%`)
-  const { data, error } = await q
-  if (error) throw error
-  return (data ?? []) as Submission[]
+  return q
 }
 
 export function submissionFilters(lookups: Lookups, opts: { statuses?: SubmissionStatus[]; withPeriod?: boolean } = {}): FilterDef[] {

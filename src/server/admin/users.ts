@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { authorize } from "@/lib/auth"
-import { must, run } from "@/lib/actions"
+import { describeError, must, run } from "@/lib/actions"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { appOrigin } from "@/lib/app-url"
 import { BLOCKED_RECIPIENT_MESSAGE, emailAllowlist, isAllowedRecipient } from "@/lib/email-allowlist"
@@ -203,30 +203,45 @@ export async function sendPasswordReset(profileId: string) {
 
 /** Disabling blocks all data access immediately (RLS) and bans the auth user so sessions cannot refresh. */
 export async function setUserStatus(profileId: string, status: "active" | "disabled") {
-  return run(async () => {
+  const outcome = { banProblem: "" }
+  const result = await run(async () => {
     const { supabase, userId } = await authorize(["super_admin"])
-    if (profileId === userId) throw new Error("You cannot change your own status")
-    must(await supabase.from("profiles").update({ status }).eq("id", id.parse(profileId)))
+    const pid = id.parse(profileId)
+    if (pid === userId) throw new Error("You cannot change your own status")
+    const updated = must(await supabase.from("profiles").update({ status }).eq("id", pid).select("id"))
+    if (!updated.length) throw new Error("User not found")
+    // The profile status alone blocks all data access (RLS); the ban also stops sessions from refreshing.
+    // updateUserById reports failure in its result, so check it rather than relying on a throw.
     try {
-      const admin = createAdminClient()
-      await admin.auth.admin.updateUserById(profileId, { ban_duration: status === "disabled" ? "876000h" : "none" })
-    } catch {
-      // Without the service role key the profile status alone still blocks all access via RLS.
+      const ban = await createAdminClient().auth.admin.updateUserById(pid, { ban_duration: status === "disabled" ? "876000h" : "none" })
+      if (ban.error) outcome.banProblem = ban.error.message
+    } catch (error) {
+      outcome.banProblem = describeError(error)
     }
+    if (outcome.banProblem) console.error("[setUserStatus] sign-in ban not updated", { profileId: pid, status, error: outcome.banProblem })
     revalidatePath("/admin/interns")
     revalidatePath("/admin/settings")
     revalidatePath("/admin/users")
   }, status === "disabled" ? "User disabled" : "User re-enabled")
+  if (!result.ok || !outcome.banProblem) return result
+  return {
+    ...result,
+    message:
+      status === "disabled"
+        ? `User disabled: their data access is blocked, but their sign-in could not be banned (${outcome.banProblem}). Try again.`
+        : `User re-enabled, but their sign-in ban could not be lifted (${outcome.banProblem}). Try again.`,
+  }
 }
 
 export async function updateIntern(internId: string, input: InternUpdateInput) {
   return run(async () => {
     const { campaign_ids, ...fields } = internUpdateSchema.parse(input)
     const { supabase, userId } = await authorize(["super_admin"])
-    must(await supabase.from("profiles").update(blankToNull(fields)).eq("id", id.parse(internId)).eq("role", "intern"))
-    const { data: existing } = await supabase.from("intern_assignments").select("campaign_id, is_active").eq("intern_id", internId)
+    const updated = must(await supabase.from("profiles").update(blankToNull(fields)).eq("id", id.parse(internId)).eq("role", "intern").select("id"))
+    if (!updated.length) throw new Error("Team member not found")
+    const existing = must(await supabase.from("intern_assignments").select("campaign_id, is_active").eq("intern_id", internId))
     const wanted = new Set(campaign_ids)
-    const off = (existing ?? []).filter((a) => a.is_active && !wanted.has(a.campaign_id)).map((a) => a.campaign_id)
+    const off = existing.filter((a) => a.is_active && !wanted.has(a.campaign_id)).map((a) => a.campaign_id)
     if (off.length) must(await supabase.from("intern_assignments").update({ is_active: false }).eq("intern_id", internId).in("campaign_id", off))
     if (campaign_ids.length)
       must(

@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/shared/empty-state"
 import { ToneBadge } from "@/components/shared/status-badge"
 import { formatDateTime } from "@/lib/format"
 import { utcRange } from "@/lib/reporting"
-import { getLookups, getSetting, param, resolvePeriod, type SearchParams } from "@/server/queries"
+import { getLookups, getSetting, param, resolvePeriod, searchTerm, type SearchParams } from "@/server/queries"
 import type { ActivityLog } from "@/lib/types"
 
 export const metadata = { title: "Activity Logs" }
@@ -38,7 +38,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
   else if (action === "workflow") q = q.like("action", "submission.%")
   else if (action === "override") q = q.eq("action", "submission.admin_override")
   else if (action === "data") q = q.in("action", ["insert", "update", "delete"])
-  const text = param(sp, "q").trim().replace(/[%_,()*\\]/g, " ")
+  const text = searchTerm(param(sp, "q"))
   if (text) q = q.or(`summary.ilike.%${text}%,entity_id.ilike.%${text}%`)
   if (param(sp, "period") || param(sp, "from")) {
     const p = resolvePeriod(sp, reports.timezone, "last_7")

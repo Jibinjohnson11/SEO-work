@@ -4,6 +4,7 @@ import { z } from "zod"
 import { authorize } from "@/lib/auth"
 import { run } from "@/lib/actions"
 import { can } from "@/lib/permissions"
+import { searchTerm } from "@/server/queries"
 
 export interface SearchHit {
   group: string
@@ -20,7 +21,8 @@ export interface SearchHit {
  */
 export async function globalSearch(raw: string) {
   return run(async () => {
-    const q = z.string().trim().min(2).max(80).parse(raw).replace(/[%_,()*\\]/g, " ")
+    const q = searchTerm(z.string().trim().min(2).max(80).parse(raw))
+    if (!q) return [] as SearchHit[]
     const like = `%${q}%`
     const { supabase, profile, permissions } = await authorize(["super_admin", "intern", "client"])
     const hits: SearchHit[] = []

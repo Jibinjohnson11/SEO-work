@@ -19,10 +19,12 @@ function revalidateAccess() {
 
 /** Keeps app_metadata in step with the profile (best effort; the profile is the source of truth). */
 async function syncAuthRole(userId: string, role: AssignableRole) {
+  // Access is governed entirely by the profile, so a failure is logged, not shown.
   try {
-    await createAdminClient().auth.admin.updateUserById(userId, { app_metadata: { role } })
-  } catch {
-    // Without the service role key, access is still governed entirely by the profile.
+    const { error } = await createAdminClient().auth.admin.updateUserById(userId, { app_metadata: { role } })
+    if (error) console.error("[syncAuthRole] role marker not updated", { userId, error: error.message })
+  } catch (error) {
+    console.error("[syncAuthRole] role marker not updated", { userId, error: (error as Error).message })
   }
 }
 

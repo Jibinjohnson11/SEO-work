@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
-import { authorize } from "@/lib/auth"
+import { ActionError, authorize } from "@/lib/auth"
 import { must, run } from "@/lib/actions"
 import { getSetting } from "@/server/queries"
 import { unifiedReport, unifiedToExport } from "@/server/unified-report"
@@ -53,7 +53,8 @@ export async function setReportPublished(reportId: string, published: boolean) {
 export async function deleteReport(reportId: string) {
   return run(async () => {
     const { supabase } = await authorize(["super_admin"])
-    must(await supabase.from("reports").delete().eq("id", id.parse(reportId)).eq("status", "draft"))
+    const deleted = must(await supabase.from("reports").delete().eq("id", id.parse(reportId)).eq("status", "draft").select("id"))
+    if (!deleted.length) throw new ActionError("Only draft reports can be deleted. Unpublish this report first.")
     revalidatePath("/admin/reports", "layout")
   }, "Draft report deleted")
 }

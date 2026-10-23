@@ -92,6 +92,9 @@ export async function bulkTaskAction(
   return run(async () => {
     const ids = z.array(id).min(1).parse(taskIds)
     const { supabase } = await authorize(["super_admin"])
+    // Same rule as createTasks: only members who can receive tasks (active or invited, with My Tasks).
+    if (action.type === "reassign" && !(await assignableMembers(supabase)).some((m) => m.id === action.internId))
+      throw new ActionError("That team member can no longer receive tasks")
     const patch =
       action.type === "status"
         ? { status: taskUpdateSchema.shape.status.parse(action.status) }
@@ -107,7 +110,9 @@ export async function deleteTask(taskId: string) {
   return run(async () => {
     const { supabase } = await authorize(["super_admin"])
     const tid = id.parse(taskId)
-    const { count } = await supabase.from("backlink_submissions").select("id", { count: "exact", head: true }).eq("task_id", tid)
+    // A failed count must not fall through to delete: submissions would silently lose their task link.
+    const { count, error } = await supabase.from("backlink_submissions").select("id", { count: "exact", head: true }).eq("task_id", tid)
+    if (error) throw error
     if (count) must(await supabase.from("tasks").update({ status: "cancelled" }).eq("id", tid))
     else must(await supabase.from("tasks").delete().eq("id", tid))
     revalidatePath("/admin/tasks")

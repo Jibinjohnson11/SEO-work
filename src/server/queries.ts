@@ -69,6 +69,14 @@ export function param(sp: SearchParams, key: string): string {
   return (Array.isArray(v) ? v[0] : v) ?? ""
 }
 
+/**
+ * Search text that is safe inside a PostgREST or=(…) filter and an ilike pattern: wildcards and the
+ * filter syntax characters (, ( ) " \) are replaced by spaces. A '"' used to break the filter (error page).
+ */
+export function searchTerm(raw: string): string {
+  return raw.trim().replace(/[%_,()*"\\]/g, " ").trim()
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 export function resolvePeriod(sp: SearchParams, timeZone: string, fallback: PeriodPreset = "today") {
   const period = param(sp, "period")

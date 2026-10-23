@@ -1,6 +1,6 @@
 import "server-only"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { param, type SearchParams } from "@/server/queries"
+import { param, searchTerm, type SearchParams } from "@/server/queries"
 import type { PublishedBacklink } from "@/lib/types"
 
 export type PublishedRow = PublishedBacklink & { backlink_submissions: { code: string; status: string } }
@@ -14,7 +14,7 @@ export async function queryPublished(supabase: SupabaseClient, sp: SearchParams,
   const live = param(sp, "live")
   if (live) q = q.eq("live_status", live)
   else if (opts.liveStatuses) q = q.in("live_status", opts.liveStatuses)
-  const text = param(sp, "q").trim().replace(/[%_,()*\\]/g, " ")
+  const text = searchTerm(param(sp, "q"))
   if (text) {
     // PostgREST cannot OR across an embedded table, so resolve matching submission codes first.
     const { data: codes } = await supabase.from("backlink_submissions").select("id").ilike("code", `%${text}%`).limit(200)

@@ -202,10 +202,15 @@ export async function requestPasswordReset(_prev: FormState, formData: FormData)
   if (!origin) return { error: LINKS_UNCONFIGURED }
   const supabase = await createClient()
   // Outside the allowlist (non-production only) nothing is sent; the answer is the same either way.
-  if (isAllowedRecipient(email.data, emailAllowlist()))
-    await supabase.auth.resetPasswordForEmail(email.data, {
+  // Server logs only, never the address: the user always sees the same generic message.
+  if (!isAllowedRecipient(email.data, emailAllowlist())) {
+    console.warn("[resetPassword] skipped: recipient is not on EMAIL_ALLOWED_RECIPIENTS; nothing was sent")
+  } else {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.data, {
       redirectTo: `${origin}/auth/confirm?next=/auth/set-password`,
     })
+    if (error) console.error("[resetPassword] auth rejected", { status: error.status, code: error.code })
+  }
   // Same response whether or not the account exists.
   return { message: "If an account exists for that email, a reset link is on its way." }
 }

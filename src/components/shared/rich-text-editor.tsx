@@ -48,9 +48,10 @@ export function RichTextEditor({
   const ref = useRef<HTMLDivElement>(null)
 
   // Only push external values in (initial value, form reset); typing is never overwritten.
+  // Stored content is sanitized before it reaches the DOM: it may have been saved without the server action.
   useEffect(() => {
     const el = ref.current
-    if (el && el.innerHTML !== value && document.activeElement !== el) el.innerHTML = value
+    if (el && el.innerHTML !== value && document.activeElement !== el) el.innerHTML = sanitizeRichText(value)
   }, [value])
 
   const emit = () => onChange(ref.current?.innerHTML ?? "")

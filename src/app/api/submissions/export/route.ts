@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
   const sp = Object.fromEntries(request.nextUrl.searchParams)
   const [lookups, reports] = await Promise.all([getLookups(session.supabase), getSetting("reports")])
-  const subs = await querySubmissions(session.supabase, sp, { timeZone: reports.timezone, limit: 10000 })
+  const subs = await querySubmissions(session.supabase, sp, { timeZone: reports.timezone, all: true })
   const l = labelMaps(lookups)
   const body = await renderExport(
     {
